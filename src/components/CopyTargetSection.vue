@@ -68,13 +68,6 @@
         </div>
       </v-expand-transition>
 
-      <!-- Per-target consistency check (on this target's selected variant) -->
-      <consistency-panel
-        v-if="targetIssues.length"
-        :issues="targetIssues"
-        class="mb-3"
-      />
-
       <!-- Copy field list -->
       <v-divider class="mb-3" />
       <copy-button
@@ -95,9 +88,7 @@ import { computed, ref, watch } from "vue";
 import type { TargetState } from "@/composables/useCopyStation";
 import type { GrokBotProfile } from "@/types/botSchema";
 
-import { botConsistencyCheck } from "@/utils/botConsistencyCheck";
 import CopyButton from "@/components/CopyButton.vue";
-import ConsistencyPanel from "@/components/panels/ConsistencyPanel.vue";
 
 const props = defineProps<{
   state: TargetState;
@@ -119,12 +110,6 @@ const visibleFields = computed(() =>
     if (!HIDEABLE_FIELDS.has(field.id)) return true;
     return !isEmptyExtract(field.extract(props.state.context.value));
   }),
-);
-
-const targetIssues = computed(() =>
-  props.state.effectiveBot.value
-    ? botConsistencyCheck(props.state.effectiveBot.value)
-    : [],
 );
 
 const variantItems = computed(() => {

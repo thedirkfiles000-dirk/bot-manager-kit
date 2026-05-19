@@ -81,9 +81,6 @@
           v-model:open-nodes="openNodes"
           class="drawer-tree"
         />
-        <div v-if="consistencyIssues.length" class="drawer-footer pa-2">
-          <consistency-panel :issues="consistencyIssues" />
-        </div>
       </div>
     </v-navigation-drawer>
 
@@ -232,9 +229,7 @@ import { useDisplay } from "vuetify";
 import TreePanel from "@/components/TreePanel.vue";
 import TreeEditor from "@/components/TreeEditor.vue";
 import ImagesWorkspace from "@/components/ImagesWorkspace.vue";
-import ConsistencyPanel from "@/components/panels/ConsistencyPanel.vue";
 import { buildFullTree } from "@/utils/treeBuilder.ts";
-import { botConsistencyCheck } from "@/utils/botConsistencyCheck";
 
 const { smAndDown: isMobile } = useDisplay();
 
@@ -275,11 +270,6 @@ const treeNodes = computed(() => {
   const rawBot = botStore.currentBot;
   if (!rawBot) return [];
   return buildFullTree(rawBot.background?.characters ?? []);
-});
-
-const consistencyIssues = computed(() => {
-  void botStore.editGeneration; // re-evaluate on every edit
-  return botStore.currentBot ? botConsistencyCheck(botStore.currentBot) : [];
 });
 
 const activeNode = computed<TreeNode | null>(() => {
