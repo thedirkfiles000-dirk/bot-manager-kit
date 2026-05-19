@@ -1,0 +1,11 @@
+/* Global app styles — keep minimal, let Vuetify own the rest */
+
+/* Ensure the app fills the Tauri window completely */
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}

@@ -1,0 +1,343 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "polybuzz.schema.json",
+  "title": "PolyBuzz Effective Bot Export",
+  "description": "The fully-transformed export shape consumed by the PolyBuzz platform. Derived from a GrokBotProfile (post variant-merge) by ExporterPolyBuzz. Split into three logical sections that map to distinct PolyBuzz form fields: identity (name/description/greeting), background (system context fed as the bot's background prompt), and dialog (few-shot example conversations). Empty/null fields are always stripped before export.",
+  "type": "object",
+  "required": ["identity", "background", "dialog"],
+  "additionalProperties": false,
+  "properties": {
+
+    "identity": {
+      "$ref": "#/$defs/Identity",
+      "description": "Top-level platform fields. Maps to PolyBuzz: bot name, description (search listing), and first message."
+    },
+
+    "background": {
+      "$ref": "#/$defs/Background",
+      "description": "Structured LLM context. Paste into PolyBuzz's 'Background' field. Contains global RP rules, world canon, and per-character profiles — all keyed at the root level so serialisation order matches intended prompt order: rules → constraints → canon → characters."
+    },
+
+    "dialog": {
+      "$ref": "#/$defs/Dialog",
+      "description": "Flattened few-shot dialog examples collected from all characters. Paste into PolyBuzz's 'Example Conversations' field."
+    }
+  },
+
+  "$defs": {
+
+    "Identity": {
+      "type": "object",
+      "required": ["name", "intro", "greeting"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Bot display name. Maps to PolyBuzz: 'Bot Name'."
+        },
+        "intro": {
+          "type": "string",
+          "description": "Public-facing scenario description shown in search listings. Maps to PolyBuzz: 'Description'. Source: GrokBotProfile.intro (not usage_hints, which is creator-only)."
+        },
+        "greeting": {
+          "type": "string",
+          "description": "The bot's opening message. Maps to PolyBuzz: 'First Message' / 'Greeting'."
+        }
+      }
+    },
+
+    "Background": {
+      "type": "object",
+      "description": "Flat object whose property order defines prompt section order. Reserved keys: 'response_priority', 'rp_rules', 'boundaries', 'meta', 'canon'. All other keys are character names pointing to Character objects.",
+      "properties": {
+        "response_priority": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Ordered tie-breaker list for conflicting instructions. Placed before rp_rules — earlier entries win."
+        },
+        "rp_rules": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Global behavioral rules for the roleplay session. Placed first in prompt for strongest LLM adherence."
+        },
+        "boundaries": {
+          "$ref": "#/$defs/Boundaries",
+          "description": "Content constraints. Hoisted out of canon and rendered adjacent to rp_rules — these are behavioral instructions, not world facts."
+        },
+        "meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Technical RP rules (fourth-wall behavior, continuity). Hoisted out of canon and rendered adjacent to rp_rules."
+        },
+        "canon": {
+          "$ref": "#/$defs/Canon"
+        }
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/Character",
+        "description": "Per-character profile keyed by character name (e.g., 'Ava'). Appears after canon in prompt order."
+      }
+    },
+
+    "Canon": {
+      "type": "object",
+      "description": "World-building and scenario facts. boundaries and meta are excluded — they are hoisted to the Background level as behavioral instructions. Property order reflects intended prompt order: triggers → scenario → setting → cohorts → anchors → lorebook.",
+      "additionalProperties": false,
+      "properties": {
+        "triggers": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Conditional narrative guidance ('If X then Y' statements). Listed first in canon — these are instructions, not static facts."
+        },
+        "scenario": { "$ref": "#/$defs/Scenario" },
+        "setting": { "$ref": "#/$defs/Setting" },
+        "cohorts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Cohort" },
+          "description": "Named NPCs and recurring background figures. Listed before anchors so the cast is established when anchors reference them."
+        },
+        "anchors": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Persistent world/plot facts that must never be forgotten. Read with full cast in mind."
+        },
+        "lorebook": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/LorbookEntry" },
+          "description": "Reference material. Listed last in canon — consulted on demand rather than primed."
+        }
+      }
+    },
+
+    "Setting": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "location":          { "type": "string" },
+        "environment_tone":  { "type": "string" },
+        "realism":           { "type": "string" },
+        "era":               { "type": "string" },
+        "city":              { "type": "string" },
+        "specific_location": { "type": "string" },
+        "lifestyle":         { "type": "string" }
+      }
+    },
+
+    "Scenario": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "premise":                   { "type": "string" },
+        "ongoing_dynamic":           { "type": "string" },
+        "starting_state_with_user":  { "type": "string" }
+      }
+    },
+
+    "Cohort": {
+      "type": "object",
+      "required": ["name"],
+      "additionalProperties": false,
+      "properties": {
+        "name":      { "type": "string" },
+        "role":      { "type": "string" },
+        "signature": { "type": "string" },
+        "notes":     { "type": "string" },
+        "surfacing_rules": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Conditional guidance for when this cohort member should appear or be referenced. Use If/When phrasing."
+        }
+      }
+    },
+
+    "LorbookEntry": {
+      "type": "object",
+      "required": ["keyword", "content"],
+      "additionalProperties": false,
+      "properties": {
+        "keyword": { "type": "string" },
+        "content": { "type": "string" }
+      }
+    },
+
+    "Boundaries": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allowed":    { "type": "array", "items": { "type": "string" } },
+        "disallowed": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+
+    "Meta": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "fourth_wall_behavior": { "type": "string" },
+        "continuity_rules":     { "type": "string" }
+      }
+    },
+
+    "Character": {
+      "type": "object",
+      "description": "Per-character export block. The key in the parent Background object is the character's name. Internal system fields (id, lastModified) and dialog_examples are excluded — the latter is exported separately in the Dialog section.",
+      "required": ["name", "age", "gender", "role", "overview"],
+      "additionalProperties": false,
+      "properties": {
+        "name":                 { "type": "string" },
+        "full_name":            { "type": "string" },
+        "nickname":             { "type": "string" },
+        "archetype":            { "type": "string" },
+        "role":                 { "type": "string" },
+        "overview":             { "type": "string" },
+        "core_drive":           { "type": "string" },
+        "user_viewpoint":       { "type": "string" },
+        "age":                  { "type": "number", "minimum": 18 },
+        "gender":               { "type": "string" },
+        "orientation":          { "type": "string" },
+        "backstory":            { "type": "string" },
+        "personality":          { "$ref": "#/$defs/Personality" },
+        "appearance":           { "$ref": "#/$defs/Appearance" },
+        "skills":               { "$ref": "#/$defs/Skills" },
+        "story_hooks":          { "$ref": "#/$defs/StoryHooks" },
+        "relationships": {
+          "type": "array", "items": { "$ref": "#/$defs/Relationship" }
+        },
+        "relationship_history": { "type": "string" },
+        "behavior_rules":       { "$ref": "#/$defs/BehaviorRules" },
+        "character_rp_rules": {
+          "type": "array", "items": { "type": "string" }
+        },
+        "character_anchors": {
+          "type": "array", "items": { "type": "string" }
+        },
+        "character_triggers": {
+          "type": "array", "items": { "type": "string" }
+        },
+        "pet_names": {
+          "type": "array", "items": { "$ref": "#/$defs/PetName" }
+        },
+        "progression_phases": {
+          "type": "array", "items": { "$ref": "#/$defs/ProgressionPhase" }
+        }
+      }
+    },
+
+    "Appearance": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "height":           { "type": "string" },
+        "build":            { "type": "string" },
+        "hair":             { "type": "string" },
+        "eyes":             { "type": "string" },
+        "style":            { "type": "string" },
+        "notable_features": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+
+    "Personality": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "traits":       { "type": "array", "items": { "type": "string" } },
+        "motivations":  { "type": "string" },
+        "fears":        { "type": "string" },
+        "values":       { "type": "string" }
+      }
+    },
+
+    "Skills": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "expertise":   { "type": "array", "items": { "type": "string" } },
+        "hobbies":     { "type": "array", "items": { "type": "string" } },
+        "strengths":   { "type": "array", "items": { "type": "string" } },
+        "limitations": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+
+    "StoryHooks": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "current_conflict": { "type": "string" },
+        "goals":            { "type": "string" }
+      }
+    },
+
+    "BehaviorRules": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "boundaries":                { "type": "string" },
+        "preferred_scene_types":     { "type": "array", "items": { "type": "string" } },
+        "disallowed_scenes":         { "type": "array", "items": { "type": "string" } },
+        "romantic_availability":     { "type": "string" },
+        "speech_style":              { "type": "string" },
+        "dialect_or_accent":         { "type": "string" },
+        "pacing_preference":         { "type": "string" },
+        "character_specific_themes": { "type": "string" }
+      }
+    },
+
+    "PetName": {
+      "type": "object",
+      "required": ["name"],
+      "additionalProperties": false,
+      "properties": {
+        "name":    { "type": "string" },
+        "trigger": { "type": "string" }
+      }
+    },
+
+    "ProgressionPhase": {
+      "type": "object",
+      "required": ["phase", "description"],
+      "additionalProperties": false,
+      "properties": {
+        "phase":       { "type": "string", "enum": ["early", "mid", "late"] },
+        "category":    { "type": "string", "enum": ["Phase", "Narrative", "Tone"] },
+        "cue":         { "type": "string" },
+        "description": { "type": "string" }
+      }
+    },
+
+    "Relationship": {
+      "type": "object",
+      "required": ["name"],
+      "additionalProperties": false,
+      "properties": {
+        "name":  { "type": "string" },
+        "role":  { "type": "string" },
+        "notes": { "type": "string" }
+      }
+    },
+
+    "Dialog": {
+      "type": "object",
+      "required": ["dialog_examples"],
+      "additionalProperties": false,
+      "properties": {
+        "dialog_examples": {
+          "type": "array",
+          "description": "Each entry is one conversation block. All characters' dialog_examples are flattened in character-declaration order, then array order within each character.",
+          "items": {
+            "type": "object",
+            "required": ["dialog"],
+            "additionalProperties": false,
+            "properties": {
+              "dialog": {
+                "type": "array",
+                "description": "Ordered lines formatted as 'Speaker: line text'. Empty lines are filtered.",
+                "items": { "type": "string", "pattern": "^.+: .+" },
+                "minItems": 1
+              }
+            }
+          }
+        }
+      }
+    }
+
+  }
+}

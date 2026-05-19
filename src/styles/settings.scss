@@ -1,0 +1,21 @@
+// src/styles/settings.scss
+// Vuetify SASS variable overrides.
+// Uses @forward so variables are accessible in component <style lang="scss"> blocks:
+//   @use '@/styles/settings';
+//
+// Variable reference: https://vuetifyjs.com/api/globals/
+// Per-component variables are on each component's API page.
+//
+// NOTE: No comments allowed inside the with() block — SASS syntax restriction.
+// Uncomment variables below to override Vuetify defaults.
+//
+// $layers: true  ← re-enable once Vuetify > 4.0.5 ships it (cascade layer support)
+// $body-font-family: ('Inter', sans-serif)
+// $font-size-root: 14px
+// $border-radius-root: 6px
+// $spacer: 4px
+// $shadow-key-umbra-opacity: 0.15
+// $shadow-key-penumbra-opacity: 0.08
+// $shadow-ambient-shadow-opacity: 0.06
+
+@forward 'vuetify/settings';

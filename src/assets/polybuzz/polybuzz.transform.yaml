@@ -1,0 +1,322 @@
+# PolyBuzz Export Transform Map
+# ============================================================
+# Source schema : grokbot.schema.json  (GrokBotProfile)
+# Target schema : polybuzz.schema.json (PolyBuzzExport)
+# Implemented in: src/components/panels/ExporterPolyBuzz.vue
+#
+# Notation
+# --------
+#   src / dst  — dot-path from schema root; [*] means "for each element"
+#   op         — transformation operation (see Operations below)
+#   when       — only emit field if this condition is truthy
+#   drop       — fields stripped and never emitted
+#   note       — design rationale or PolyBuzz-specific guidance
+#
+# Operations
+# ----------
+#   identity     Copy value as-is.
+#   rename       Copy value to a different key path; src key is not present in output.
+#   hoist        Move a nested value up to a shallower path.
+#   rekey        Re-index an array of objects into an object keyed by a field value.
+#   flatten      Merge multiple source arrays/objects into a single output collection.
+#   format       Apply a string template: "Speaker: line" → one string per dialog line.
+#   sort         Re-order array elements by a field.
+#   stripEmpties Remove all null / undefined / empty-string / empty-array values recursively.
+# ============================================================
+
+meta:
+  version: "1"
+  source_schema: "grokbot.schema.json"
+  target_schema: "polybuzz.schema.json"
+
+# ── Pre-processing ────────────────────────────────────────────────────────────
+# Applied once to the full GrokBotProfile before any field mapping.
+
+pre_processing:
+  - op: apply_variant_merging
+    note: >
+      getEffectiveBot(bot, activeVariant) is called first.
+      All subsequent src paths refer to the merged (effective) bot,
+      not the raw base bot.
+
+  - op: stripEmpties
+    exclude_from_strip: [cid, usage_hints, lastModified]
+    note: >
+      Strips null, undefined, empty strings, and empty arrays recursively.
+      cid/usage_hints/lastModified are excluded from stripping then immediately
+      dropped in the drop list — explicit removal is cleaner than relying on
+      empties behaviour for system fields.
+
+# ── Global Drops ──────────────────────────────────────────────────────────────
+# These fields exist in GrokBotProfile but are never present in any export section.
+
+drop:
+  - field: schema_version
+    reason: Internal versioning. Not meaningful to LLM context.
+  - field: id
+    reason: UUID has no role in the PolyBuzz prompt.
+  - field: cid
+    reason: Creator/collection ID is a platform-management field.
+  - field: usage_hints
+    reason: Creator-only notes; explicitly excluded to prevent LLM confusion.
+  - field: lastModified
+    reason: Timestamp; irrelevant to LLM context.
+  - field: status
+    reason: Publishing state; not part of the prompt.
+  - field: flags
+    reason: Deprecated field.
+  - field: images
+    reason: Image filenames have no LLM representation.
+  - field: profileImage
+    reason: See images.
+  - field: imagesCount
+    reason: See images.
+  - field: profileUrl
+    reason: Ephemeral blob URL; session-scoped only.
+  - field: variants
+    reason: Variant metadata is resolved during pre-processing; raw overrides must not leak into the prompt.
+  - field: "background.characters[*].id"
+    reason: Per-character UUID.
+  - field: "background.characters[*].lastModified"
+    reason: Per-character timestamp.
+  - field: "background.characters[*].usage_hints"
+    reason: Deprecated per-character creator notes (legacy field, cleaned on load).
+  - field: "background.characters[*].dialog_examples"
+    reason: Moved to the Dialog section; absent from Background to avoid duplication.
+
+# ── Section: identity ─────────────────────────────────────────────────────────
+# Maps to PolyBuzz platform form fields (not part of the background prompt).
+
+identity:
+  - src: name
+    dst: identity.name
+    op: identity
+
+  - src: intro
+    dst: identity.intro
+    op: identity
+    note: >
+      PolyBuzz calls this the "Description" (search listing).
+      Do not confuse with usage_hints, which is creator-only and always dropped.
+
+  - src: greeting
+    dst: identity.greeting
+    op: identity
+    note: Maps to PolyBuzz "First Message".
+
+# ── Section: background ───────────────────────────────────────────────────────
+# The LLM context block. Paste into PolyBuzz "Background" field.
+# Property order in the output object is intentional: rules → constraints → canon → characters.
+# Rationale: hard constraints and behavioral instructions first; world facts second;
+# character identity closest to generation.
+# Within canon: instructions (triggers) before facts (scenario, setting, cohorts, anchors, lorebook).
+
+background:
+
+  # — Response Priority —
+  # Ordered tie-breaker list placed before rp_rules so the LLM sees the conflict-
+  # resolution framework before reading the rules whose conflicts it must arbitrate.
+  - src: response_priority
+    dst: background.response_priority
+    op: identity
+    when: "response_priority.length > 0"
+
+  # — Global RP Rules —
+  - src: rp_rules
+    dst: background.rp_rules
+    op: identity
+    when: "rp_rules.length > 0"
+    note: >
+      Placed first so hard constraints are at the top of the LLM context window.
+
+  # — Constraints (hoisted from canon) —
+  # boundaries and meta are behavioral instructions, not world facts.
+  # Rendering them adjacent to rp_rules groups all constraints together and
+  # keeps the canon block semantically clean as a facts-only section.
+
+  - src: background.boundaries
+    dst: background.boundaries
+    op: rename
+    when: "boundaries.allowed.length > 0 or boundaries.disallowed.length > 0"
+
+  - src: background.meta
+    dst: background.meta
+    op: rename
+    when: "fourth_wall_behavior or continuity_rules is non-empty"
+
+  # — Canon (world-building block) —
+  # GrokBotProfile nests world data under "background". The export renames this
+  # container to "canon" to signal to the LLM that these are fixed facts, not
+  # instructions, and to avoid name collision with the PolyBuzz "Background" field.
+  # Within canon, triggers lead because they are conditional instructions;
+  # scenario before setting (active situation before atmospheric texture);
+  # cohorts before anchors (cast established before anchors reference them).
+
+  - src: background.triggers
+    dst: background.canon.triggers
+    op: rename
+    when: "triggers.length > 0"
+
+  - src: background.scenario
+    dst: background.canon.scenario
+    op: rename
+    when: "any scenario field is non-empty"
+
+  - src: background.setting
+    dst: background.canon.setting
+    op: rename
+    when: "any setting field is non-empty"
+
+  - src: background.cohorts
+    dst: background.canon.cohorts
+    op: rename
+    when: "cohorts.length > 0"
+
+  - src: background.anchors
+    dst: background.canon.anchors
+    op: rename
+    when: "anchors.length > 0"
+
+  - src: background.lorebook
+    dst: background.canon.lorebook
+    op: rename
+    when: "lorebook.length > 0"
+
+  # — Characters (array → name-keyed map) —
+  # Each character in the source array becomes a top-level key in background,
+  # named by the character's display name. This makes character sections
+  # addressable by name in markdown/YAML output and preserves declaration order.
+  # Field order: identity → backstory → personality → appearance → skills →
+  # story_hooks → relationships → behavior_rules → character_rp_rules →
+  # anchors → triggers → pet_names → progression_phases.
+  # Identity and internal state first; behavioral constraints and escalation last.
+
+  - src: "background.characters[*]"
+    dst: "background.{char.name}"
+    op: rekey
+    key_field: name
+    include_fields:
+      - name
+      - full_name
+      - nickname
+      - archetype
+      - role
+      - overview
+      - core_drive
+      - user_viewpoint
+      - age
+      - gender
+      - orientation
+      - backstory
+      - personality
+      - appearance
+      - skills
+      - story_hooks
+      - relationships
+      - relationship_history
+      - behavior_rules
+      - character_rp_rules
+      - character_anchors
+      - character_triggers
+      - pet_names
+      - progression_phases
+    exclude_fields:
+      - id
+      - lastModified
+      - usage_hints
+      - dialog_examples       # exported separately in Dialog section
+    note: >
+      dialog_examples is the only character field split to a different section.
+      All other character fields travel together to keep the LLM context
+      self-contained per character.
+
+# ── Section: dialog ───────────────────────────────────────────────────────────
+# Few-shot examples. Paste into PolyBuzz "Example Conversations" field.
+
+dialog:
+  - src: "background.characters[*].dialog_examples"
+    dst: "dialog.dialog_examples"
+    op: flatten
+    note: >
+      Outer iteration: characters in declaration order.
+      Inner iteration: each character's dialog_examples array in order.
+      Empty inner arrays are skipped entirely.
+
+  - src: "background.characters[*].dialog_examples[*][*]"
+    dst: "dialog.dialog_examples[*].dialog[*]"
+    op: format
+    template: "{line.speaker}: {line.line}"
+    when: "line.line.trim().length > 0"
+    note: >
+      Each DialogLineBlock { speaker, line } is serialised as a plain string.
+      Empty lines are filtered. The "Speaker: text" format is the standard
+      PolyBuzz example conversation syntax.
+
+# ── Optimization Notes ────────────────────────────────────────────────────────
+# Observations on the current export layout relative to PolyBuzz best practices.
+
+optimization_notes:
+
+  - section: background
+    aspect: property_order
+    status: optimal
+    detail: >
+      rp_rules → boundaries + meta → canon → characters.
+      All behavioral instructions (rules, constraints, fourth-wall/continuity rules)
+      are grouped at the top before any world facts. Within canon: triggers first
+      (conditional instructions), then scenario (active situation), setting (texture),
+      cohorts (cast), anchors (persistent truths), lorebook (reference material last).
+      Character fields follow the same principle: identity and internal state before
+      behavioral constraints and escalation mechanics.
+
+  - section: background.canon
+    aspect: key_rename
+    status: optimal
+    detail: >
+      Renaming "background" → "canon" avoids a confusing collision where the
+      GrokBotProfile key "background" would appear inside the PolyBuzz
+      "Background" field. It also signals fixed-fact semantics vs. instructions.
+      boundaries and meta are excluded from canon for the same reason — they are
+      instructions, not facts, and belong adjacent to rp_rules.
+
+  - section: background.characters
+    aspect: array_to_map
+    status: optimal
+    detail: >
+      Reindexing the characters array into name-keyed top-level keys makes
+      each character section addressable in markdown (## Ava) and YAML output.
+      The LLM reads character sections as independent named blocks rather than
+      positional array entries.
+
+  - section: dialog
+    aspect: separation_from_background
+    status: optimal
+    detail: >
+      PolyBuzz has a distinct "Example Conversations" field separate from
+      "Background". Keeping dialog out of the background prompt avoids token
+      waste in the system context while placing examples where the platform
+      expects them.
+
+  - section: dialog
+    aspect: flattening_strategy
+    status: acceptable
+    detail: >
+      All characters' dialog is flattened into a single list. If PolyBuzz
+      ever supports per-character example labeling, emitting character-labeled
+      dialog blocks would be preferable. Current flat format is the platform
+      maximum.
+
+  - section: identity.intro
+    aspect: field_selection
+    status: optimal
+    detail: >
+      Uses intro (public scenario description) rather than usage_hints
+      (creator notes). usage_hints is intentionally excluded from all exports.
+
+  - section: background.characters[*]
+    aspect: dialog_examples_exclusion
+    status: required
+    detail: >
+      dialog_examples must not appear in the background export. Including them
+      would duplicate examples in the system prompt AND the example conversations
+      field, which degrades LLM response quality.
