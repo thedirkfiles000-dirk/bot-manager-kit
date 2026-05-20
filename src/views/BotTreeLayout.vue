@@ -23,14 +23,6 @@
         </v-list>
       </v-menu>
 
-      <!-- Export (Copy Station) -->
-      <v-btn
-        icon="mdi-export-variant"
-        variant="text"
-        @click="goToExport"
-        title="Export (Copy Station)"
-      />
-
       <!-- Theme toggle -->
       <v-btn
         :icon="settingsStore.theme === 'dark' ? 'mdi-weather-sunny' : 'mdi-weather-night'"
@@ -196,23 +188,6 @@
         </v-card>
       </v-dialog>
 
-      <!-- Delete Confirmation Dialog (add near bottom of template) -->
-      <v-dialog v-model="deleteDialog" max-width="500" persistent>
-        <v-card>
-          <v-card-title class="text-h6"> Delete Character? </v-card-title>
-          <v-card-text>
-            Permanently delete "<strong>{{ charToDelete?.title }}</strong
-            >"? This cannot be undone.
-          </v-card-text>
-          <v-card-actions>
-            <v-spacer />
-            <v-btn variant="text" @click="deleteDialog = false">Cancel</v-btn>
-            <v-btn color="error" variant="tonal" @click="confirmDelete">
-              Delete
-            </v-btn>
-          </v-card-actions>
-        </v-card>
-      </v-dialog>
     </v-main>
   </v-app>
 </template>
@@ -265,13 +240,12 @@ const isReloading = ref(false);
 const activeNodeId = ref<string[]>([]);
 const openNodes = ref<string[]>([]);
 
-const deleteDialog = ref(false);
-const charToDelete = ref<{ id: string; title: string } | null>(null);
-
 const treeNodes = computed(() => {
   const rawBot = botStore.currentBot;
   if (!rawBot) return [];
-  return buildFullTree(rawBot.background?.characters ?? []);
+  // rawBot reference retained so the tree recomputes if the bot identity changes.
+  void rawBot;
+  return buildFullTree();
 });
 
 const activeNode = computed<TreeNode | null>(() => {
@@ -380,18 +354,6 @@ async function saveAndLeave() {
   }
 }
 
-async function goToExport() {
-  if (!botStore.currentBot) return;
-  if (botStore.isDirty) {
-    await botStore.save();
-    if (botStore.isDirty) return; // save failed
-  }
-  router.push({
-    name: "copy-station",
-    params: { schemaName: schemaName.value, botId: botStore.currentBot.id },
-  });
-}
-
 function handleReload() {
   if (!botStore.isDirty) {
     performReload();
@@ -418,27 +380,6 @@ async function performReload() {
 function proceedReload() {
   confirmReloadDialog.value = false;
   performReload();
-}
-
-// Find character index by node id (char-uuid)
-function findCharacterIndexByNodeId(nodeId: string): number {
-  if (!botStore.currentBot) return -1;
-  const charId = nodeId.replace("char-", "");
-  return (botStore.currentBot.background?.characters ?? []).findIndex(
-    (c) => c.id === charId,
-  );
-}
-
-// Confirm delete
-function confirmDelete() {
-  if (!charToDelete.value || !botStore.currentBot) return;
-  const index = findCharacterIndexByNodeId(charToDelete.value.id);
-  if (index !== -1) {
-    botStore.currentBot.background?.characters?.splice(index, 1);
-    botStore.setDirty();
-  }
-  deleteDialog.value = false;
-  charToDelete.value = null;
 }
 
 function saveEdit() {

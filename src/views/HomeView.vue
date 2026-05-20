@@ -15,7 +15,7 @@ import {
 import { useBotStore } from "@/stores/botStore.ts";
 import { useActiveSchemaStore } from "@/stores/activeSchemaStore.ts";
 import { botsDirFor } from "@/utils/schemaLoader.ts";
-import { GrokBotProfile } from "@/types/botSchema.ts";
+import { StarterBot } from "@/types/botSchema.ts";
 import { createDefaultBot } from "@/utils/defaultBotGenerator.ts";
 import { formatAjvErrors } from "@/utils/botValidator.ts";
 import { getMime } from "@/composables/useImageUtils.ts";
@@ -37,9 +37,9 @@ const schemaName = computed(() => route.params.schemaName as string);
 const generateUUID = () => crypto.randomUUID();
 
 const deleteDialog = ref(false);
-const botToDelete = ref<GrokBotProfile | null>(null);
+const botToDelete = ref<StarterBot | null>(null);
 
-interface BotCard extends GrokBotProfile {
+interface BotCard extends StarterBot {
   _valid: boolean;
   profileUrl?: string;
   imagesCount?: number;
@@ -54,17 +54,15 @@ const filteredBots = computed(() => {
 
   if (filterText.value.trim()) {
     const query = filterText.value.trim().toLowerCase();
-    list = list.filter((bot) => {
-      const nameMatch = (bot.name || "").toLowerCase().includes(query);
-      const cidMatch = (bot.cid || "").toLowerCase().includes(query);
-      return nameMatch || cidMatch;
-    });
+    list = list.filter((bot) =>
+      (bot.name || "").toLowerCase().includes(query),
+    );
   }
 
   return list;
 });
 
-async function duplicateBot(original: GrokBotProfile) {
+async function duplicateBot(original: StarterBot) {
   try {
     const rawClone = JSON.parse(JSON.stringify(original));
     delete rawClone._valid;
@@ -126,7 +124,7 @@ async function duplicateBot(original: GrokBotProfile) {
   }
 }
 
-function openDeleteDialog(bot: GrokBotProfile) {
+function openDeleteDialog(bot: StarterBot) {
   botToDelete.value = bot;
   deleteDialog.value = true;
 }
@@ -184,17 +182,6 @@ async function loadBots() {
       let parsed = JSON.parse(content);
 
       delete parsed._valid;
-      // Legacy GrokBot character-level usage_hints cleanup (harmless on schemas
-      // that never had it). Will move to schema-driven normalization in task #9.
-      if (parsed.background?.characters) {
-        parsed.background.characters = parsed.background.characters.map(
-          (c: any) => {
-            const { usage_hints, ...rest } = c;
-            return rest;
-          },
-        );
-      }
-
       rawBot = parsed;
     } catch (e) {
       console.error(
@@ -247,7 +234,7 @@ onMounted(async () => {
 const importJsonDialog = ref(false);
 const importJsonText = ref("");
 const jsonError = ref<string | null>(null);
-const importedParsed = ref<GrokBotProfile | null>(null);
+const importedParsed = ref<StarterBot | null>(null);
 const importValidationErrors = ref<string[]>([]);
 const importedBotId = ref<string | null>(null);
 
@@ -379,7 +366,7 @@ watch(
       const newId = generateUUID();
       const now = new Date().toISOString();
 
-      const merged: GrokBotProfile = JSON.parse(
+      const merged: StarterBot = JSON.parse(
         JSON.stringify(createDefaultBot()),
       );
 
@@ -394,12 +381,7 @@ watch(
         merged.name = "Imported Bot";
       }
 
-      (merged.background?.characters ?? []).forEach((char: any) => {
-        char.id = generateUUID();
-        char.lastModified = now;
-      });
-
-      const cleaned = stripUnknownFields(merged, activeSchemaStore.active!.raw) as GrokBotProfile;
+      const cleaned = stripUnknownFields(merged, activeSchemaStore.active!.raw) as StarterBot;
 
       const { valid, errors } = activeSchemaStore.validateBot(cleaned);
       if (!valid) {
@@ -462,12 +444,11 @@ async function applyImportedJson() {
   }
 }
 
-function importNavigate(destination: 'editor' | 'copy-station') {
+function importNavigate() {
   const botId = importedBotId.value;
   if (!botId) return;
   closeImportJson();
-  const target = destination === 'editor' ? 'bot-tree' : 'copy-station';
-  router.push({ name: target, params: { schemaName: schemaName.value, botId } });
+  router.push({ name: "bot-tree", params: { schemaName: schemaName.value, botId } });
 }
 
 function toggleSort() {
@@ -535,7 +516,7 @@ const sortIcon = computed(() => {
       <v-col cols="12" md="7" lg="6">
         <v-text-field
           v-model="filterText"
-          label="Filter by name or CID"
+          label="Filter by name"
           prepend-inner-icon="mdi-magnify"
           :append-inner-icon="sortIcon"
           variant="outlined"
@@ -620,9 +601,8 @@ const sortIcon = computed(() => {
             </v-card-title>
 
             <v-card-subtitle class="text-caption text-medium-emphasis pb-2">
-              <div>CID: {{ bot.cid ?? "--" }}</div>
-              <div>
-                {{ (bot.background?.characters ?? []).length }} character{{ (bot.background?.characters ?? []).length === 1 ? "" : "s" }}
+              <div v-if="(bot as any).tagline" class="font-italic mb-1">
+                {{ (bot as any).tagline }}
               </div>
               <div>Modified: {{ new Date(bot.lastModified || "").toLocaleDateString() }}</div>
             </v-card-subtitle>
@@ -630,19 +610,6 @@ const sortIcon = computed(() => {
             <v-card-actions class="mt-auto mb-2 px-4">
               <div class="d-flex flex-column align-start">
                 <div class="d-flex ga-2 flex-wrap">
-                    <router-link
-                      :to="{ name: 'copy-station', params: { schemaName, botId: bot.id } }"
-                      @click.stop
-                    >
-                      <v-btn
-                        icon="mdi-export-variant"
-                        size="small"
-                        variant="tonal"
-                        color="success"
-                        title="Export (Copy Station)"
-                        :disabled="!bot._valid"
-                      />
-                    </router-link>
                     <router-link
                       :to="{ name: 'raw-bot', params: { schemaName, botId: bot.id } }"
                       @click.stop
@@ -717,15 +684,14 @@ const sortIcon = computed(() => {
             <p>This will create and save a new bot from the pasted JSON.</p>
             <v-list density="compact" class="pa-0 bg-transparent">
               <v-list-item>
-                A new UUID, character IDs, and timestamp will be generated.
+                A new UUID and timestamp will be generated.
               </v-list-item>
-              <v-list-item> Unknown/extra fields discarded. </v-list-item>
-              <v-list-item>Missing fields use app defaults. </v-list-item>
+              <v-list-item> Fields not in the active schema are discarded. </v-list-item>
+              <v-list-item> Missing fields use schema defaults. </v-list-item>
               <v-list-item> Images not supported (JSON only). </v-list-item>
             </v-list>
             <p>
-              The bot will appear in your library. You can then open it in the
-              editor or go straight to the Copy Station.
+              The bot will appear in your library. You can then open it in the editor.
             </p>
           </v-alert>
           <v-textarea
@@ -778,17 +744,9 @@ const sortIcon = computed(() => {
               color="primary"
               variant="tonal"
               prepend-icon="mdi-pencil"
-              @click="importNavigate('editor')"
+              @click="importNavigate()"
             >
               Open in Editor
-            </v-btn>
-            <v-btn
-              color="success"
-              variant="tonal"
-              prepend-icon="mdi-export-variant"
-              @click="importNavigate('copy-station')"
-            >
-              Open in Copy Station
             </v-btn>
           </template>
         </v-card-actions>

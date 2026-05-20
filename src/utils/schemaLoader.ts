@@ -12,10 +12,10 @@ import {
   readTextFile,
   writeTextFile,
 } from "@tauri-apps/plugin-fs";
-import bundledGrokBotSchema from "@/assets/grokbot.schema.json";
+import bundledStarterSchema from "@/assets/starter.schema.json";
 import type { SchemaMetadata } from "@/stores/activeSchemaStore";
 
-const DEFAULT_SCHEMA_NAME = "GrokBot";
+const DEFAULT_SCHEMA_NAME = "Starter";
 
 /** Absolute path to the BotSchemas root, creating it if needed. */
 export async function getSchemasRoot(): Promise<string> {
@@ -40,7 +40,7 @@ export async function ensureSchemasRoot(): Promise<void> {
   await mkdir(await join(defaultDir, "bots"), { recursive: true });
   await writeTextFile(
     await join(defaultDir, "schema.json"),
-    JSON.stringify(bundledGrokBotSchema, null, 2),
+    JSON.stringify(bundledStarterSchema, null, 2),
   );
 }
 

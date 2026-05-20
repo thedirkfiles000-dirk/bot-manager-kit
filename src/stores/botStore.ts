@@ -13,13 +13,9 @@ import {
 import { formatAjvErrors } from "@/utils/botValidator.ts";
 import { useActiveSchemaStore } from "@/stores/activeSchemaStore.ts";
 import { botsDirFor } from "@/utils/schemaLoader.ts";
-import { CharacterProfile, GrokBotProfile } from "@/types/botSchema.ts";
+import type { StarterBot } from "@/types/botSchema.ts";
 import { stripEmpties } from "@/types/typeSupport.ts";
-import { normalizeBot } from "@/utils/migrate.ts";
-import {
-  createDefaultBot,
-  createDefaultCharacter,
-} from "@/utils/defaultBotGenerator.ts";
+import { createDefaultBot } from "@/utils/defaultBotGenerator.ts";
 import { useNotify } from "@/composables/useNotify.ts";
 import { getMime } from "@/composables/useImageUtils.ts";
 
@@ -28,7 +24,7 @@ const blobUrls = ref<Set<string>>(new Set());
 export const useBotStore = defineStore("bot", () => {
   const notify = useNotify();
   const activeSchemaStore = useActiveSchemaStore();
-  const currentBot = ref<GrokBotProfile | null>(null);
+  const currentBot = ref<StarterBot | null>(null);
   const isDirty = ref(false);
   const editGeneration = ref(0);
   const loading = ref(false);
@@ -227,12 +223,6 @@ export const useBotStore = defineStore("bot", () => {
 
       // UI-only field that may have been stamped by HomeView previously.
       delete parsed._valid;
-      // Legacy variant block from BM-Desktop — the kit has no variants concept.
-      delete parsed.variants;
-      // Legacy GrokBot v1→v3 shape migrations (idempotent on modern files).
-      // TODO: when task #9 lands, the schema declares its own normalizers and
-      // this kit-level call goes away.
-      normalizeBot(parsed as GrokBotProfile);
 
       currentBot.value = parsed;
 
@@ -242,20 +232,6 @@ export const useBotStore = defineStore("bot", () => {
           "Invalid bot file: " + formatAjvErrors(errors).join("; "),
         );
       }
-
-      // GrokBot-specific: ensure characters have all expected fields. The
-      // schema-driven panels in task #9 will replace this with schema-aware
-      // defaulting.
-      let fixedCharacters: CharacterProfile[] = [];
-      for (const char of currentBot.value?.background?.characters ?? []) {
-        const base = createDefaultCharacter();
-        fixedCharacters.push({ ...base, ...char });
-      }
-      currentBot.value?.background?.characters?.splice(
-        0,
-        fixedCharacters.length,
-        ...fixedCharacters,
-      );
 
       if (!currentBot.value!.images) {
         currentBot.value!.images = [];
@@ -290,8 +266,6 @@ export const useBotStore = defineStore("bot", () => {
     try {
       loading.value = true;
 
-      normalizeBot(currentBot.value);
-
       const { valid, errors } = activeSchemaStore.validateBot(currentBot.value);
       if (!valid) {
         const errorMsg =
@@ -311,13 +285,10 @@ export const useBotStore = defineStore("bot", () => {
       };
 
       const lean = stripEmpties(updatedBot) as Record<string, any>;
-      // Ensure mandatory fields survive even if empty (GrokBot-specific —
-      // schema-driven required-field handling lands in task #9).
+      // Ensure system-required fields survive stripEmpties even when empty.
       lean.id = updatedBot.id;
       lean.name = updatedBot.name;
       lean.lastModified = updatedBot.lastModified;
-      lean.intro = (updatedBot as any).intro ?? "";
-      lean.greeting = (updatedBot as any).greeting ?? "";
 
       const path = await join(botFolder, "bot.json");
       await writeTextFile(path, JSON.stringify(lean, null, 2));
