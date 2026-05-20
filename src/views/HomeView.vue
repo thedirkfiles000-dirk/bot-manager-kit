@@ -601,8 +601,8 @@ const sortIcon = computed(() => {
             </v-card-title>
 
             <v-card-subtitle class="text-caption text-medium-emphasis pb-2">
-              <div v-if="(bot as any).tagline" class="font-italic mb-1">
-                {{ (bot as any).tagline }}
+              <div v-if="(bot as any).intro" class="font-italic mb-1" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                {{ (bot as any).intro }}
               </div>
               <div>Modified: {{ new Date(bot.lastModified || "").toLocaleDateString() }}</div>
             </v-card-subtitle>
