@@ -73,7 +73,6 @@
           v-for="ts in station.targetStates"
           :key="ts.target.id"
           :state="ts"
-          :bot="bot"
         />
       </v-container>
     </v-main>

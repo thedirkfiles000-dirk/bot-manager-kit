@@ -1,10 +1,6 @@
 <!-- src/components/panels/ItemListPanel.vue -->
 <template>
   <panel-wrapper :title="title" :max-width="900" bordered>
-    <template #actions>
-      <override-badges :path="props.path" />
-    </template>
-
     <item-list-combo
       v-model="field"
       :label="title"
@@ -26,9 +22,8 @@
 <script setup lang="ts">
 import PanelWrapper from "@/components/PanelWrapper.vue";
 import ItemListCombo from "@/components/ItemListCombo.vue";
-import { useVariantAnyField } from "@/composables/useVariantAnyField.ts";
+import { useField } from "@/composables/useField.ts";
 import { fieldPath } from "@/types/fieldPath";
-import OverrideBadges from "@/components/OverrideBadges.vue";
 
 const props = defineProps<{
   path: string;
@@ -39,5 +34,5 @@ const props = defineProps<{
   prefillButtonLabel?: string;
 }>();
 
-const field = useVariantAnyField<string[]>(fieldPath(props.path), []);
+const field = useField<string[]>(fieldPath(props.path), []);
 </script>

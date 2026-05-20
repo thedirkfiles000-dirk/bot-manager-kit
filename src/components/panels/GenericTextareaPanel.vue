@@ -1,10 +1,6 @@
 <!-- src/components/panels/GenericTextareaPanel.vue -->
 <template>
   <panel-wrapper :title="title || capitalized" :max-width="900" bordered>
-    <template #actions>
-      <override-badges :path="props.path" />
-    </template>
-
     <v-textarea
       v-model="field"
       variant="outlined"
@@ -27,9 +23,8 @@
 <script setup lang="ts">
 import PanelWrapper from "@/components/PanelWrapper.vue";
 import { computed } from "vue";
-import { useVariantAnyField } from "@/composables/useVariantAnyField.ts";
+import { useField } from "@/composables/useField.ts";
 import { fieldPath } from "@/types/fieldPath";
-import OverrideBadges from "@/components/OverrideBadges.vue";
 
 const props = defineProps<{
   path: string; // Required dot-path e.g. "greeting" or "background.meta.continuity_rules"
@@ -38,7 +33,7 @@ const props = defineProps<{
   showCharCount?: boolean;
 }>();
 
-const field = useVariantAnyField<string>(fieldPath(props.path), "");
+const field = useField<string>(fieldPath(props.path), "");
 
 // Character count (reflects the effective value after rating overrides)
 const fieldLength = computed(() => {

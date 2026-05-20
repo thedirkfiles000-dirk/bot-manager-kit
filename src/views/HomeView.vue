@@ -482,7 +482,7 @@ function stripUnknownFields(obj: any, schema: any, root: any = schema): any {
       }
       // Drop keys not in schema (additionalProperties: false)
     }
-    // Also handle additionalProperties that allow arbitrary keys (e.g., variants)
+    // Also handle additionalProperties that allow arbitrary keys
     if (schema.additionalProperties && typeof schema.additionalProperties === "object") {
       for (const key of Object.keys(obj)) {
         if (!(key in (props ?? {}))) {
@@ -809,8 +809,6 @@ const sortIcon = computed(() => {
               <div>CID: {{ bot.cid ?? "--" }}</div>
               <div>
                 {{ (bot.background?.characters ?? []).length }} character{{ (bot.background?.characters ?? []).length === 1 ? "" : "s" }}
-                &middot;
-                {{ Object.keys(bot.variants ?? {}).length === 0 ? "no variants" : Object.keys(bot.variants ?? {}).length === 1 ? "1 variant" : `${Object.keys(bot.variants ?? {}).length} variants` }}
               </div>
               <div>Modified: {{ new Date(bot.lastModified || "").toLocaleDateString() }}</div>
             </v-card-subtitle>

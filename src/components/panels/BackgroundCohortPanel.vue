@@ -98,7 +98,7 @@
 <script setup lang="ts">
 import PanelWrapper from "@/components/PanelWrapper.vue";
 import { computed, ref, watch } from "vue";
-import { useVariantAnyField } from "@/composables/useVariantAnyField.ts";
+import { useField } from "@/composables/useField.ts";
 import { fieldPath } from "@/types/fieldPath";
 import type { CohortEntry } from "@/types/botSchema";
 import ItemListCombo from "@/components/ItemListCombo.vue";
@@ -107,7 +107,7 @@ interface CohortRow extends CohortEntry {
   _key: string;
 }
 
-const cohorts = useVariantAnyField<CohortEntry[]>(
+const cohorts = useField<CohortEntry[]>(
   fieldPath("background.cohorts"),
   [],
 );

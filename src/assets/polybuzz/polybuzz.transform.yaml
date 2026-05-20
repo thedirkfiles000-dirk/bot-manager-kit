@@ -33,12 +33,6 @@ meta:
 # Applied once to the full GrokBotProfile before any field mapping.
 
 pre_processing:
-  - op: apply_variant_merging
-    note: >
-      getEffectiveBot(bot, activeVariant) is called first.
-      All subsequent src paths refer to the merged (effective) bot,
-      not the raw base bot.
-
   - op: stripEmpties
     exclude_from_strip: [cid, usage_hints, lastModified]
     note: >

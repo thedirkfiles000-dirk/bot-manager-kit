@@ -289,13 +289,6 @@
     "profileUrl": {
       "type": "string",
       "description": "Local URL to image."
-    },
-    "variants": {
-      "description": "Variant-specific overrides. Each variant overlays the base independently.",
-      "type": "object",
-      "additionalProperties": {
-        "$ref": "#/definitions/OverrideBlock"
-      }
     }
   },
   "additionalProperties": false,
@@ -600,40 +593,6 @@
       "properties": {
         "speaker": { "type": "string" },
         "line": { "type": "string" }
-      },
-      "additionalProperties": false
-    },
-    "OverrideBlock": {
-      "type": "object",
-      "required": ["bot_overrides", "character_overrides"],
-      "properties": {
-        "bot_overrides": {
-          "type": "array",
-          "items": { "$ref": "#/definitions/OverrideEntry" }
-        },
-        "character_overrides": {
-          "type": "array",
-          "items": { "$ref": "#/definitions/CharacterOverrideEntry" }
-        }
-      },
-      "additionalProperties": false
-    },
-    "OverrideEntry": {
-      "type": "object",
-      "required": ["field_path", "value"],
-      "properties": {
-        "field_path": { "type": "string" },
-        "value": {}
-      },
-      "additionalProperties": false
-    },
-    "CharacterOverrideEntry": {
-      "type": "object",
-      "required": ["character_id", "field_path", "value"],
-      "properties": {
-        "character_id": { "type": "string" },
-        "field_path": { "type": "string" },
-        "value": {}
       },
       "additionalProperties": false
     },

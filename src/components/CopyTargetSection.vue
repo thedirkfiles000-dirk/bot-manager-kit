@@ -6,19 +6,8 @@
     </v-card-title>
 
     <v-card-text>
-      <!-- Variant selector + mask toggle row -->
+      <!-- Mask toggle row -->
       <div class="d-flex align-center flex-wrap ga-3 mb-4">
-        <v-select
-          :model-value="state.variantName.value"
-          @update:model-value="onVariantChange"
-          :items="variantItems"
-          label="Variant"
-          density="compact"
-          variant="outlined"
-          hide-details
-          style="max-width: 220px"
-        />
-
         <v-btn
           variant="outlined"
           color="secondary"
@@ -86,13 +75,11 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import type { TargetState } from "@/composables/useCopyStation";
-import type { GrokBotProfile } from "@/types/botSchema";
 
 import CopyButton from "@/components/CopyButton.vue";
 
 const props = defineProps<{
   state: TargetState;
-  bot: GrokBotProfile;
 }>();
 
 const maskExpanded = ref(false);
@@ -112,15 +99,6 @@ const visibleFields = computed(() =>
   }),
 );
 
-const variantItems = computed(() => {
-  const items = [{ title: "Base", value: null as string | null }];
-  const variants = props.bot.variants ?? {};
-  for (const name of Object.keys(variants)) {
-    items.push({ title: name, value: name });
-  }
-  return items;
-});
-
 // Bridge maskedIds between masking composable and v-treeview v-model
 const maskSelected = computed({
   get: () => props.state.masking.maskedIds.value,
@@ -128,12 +106,6 @@ const maskSelected = computed({
     props.state.masking.maskedIds.value = val;
   },
 });
-
-function onVariantChange(val: string | null) {
-  props.state.variantName.value = val;
-  // Reset checkmarks when variant changes
-  props.state.copiedFields.value = new Set();
-}
 
 function onFieldCopied(fieldId: string) {
   props.state.copiedFields.value = new Set([...props.state.copiedFields.value, fieldId]);

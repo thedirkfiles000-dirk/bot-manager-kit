@@ -74,7 +74,7 @@
 <script setup lang="ts">
 import PanelWrapper from "@/components/PanelWrapper.vue";
 import { ref, watch } from "vue";
-import { useVariantAnyField } from "@/composables/useVariantAnyField.ts";
+import { useField } from "@/composables/useField.ts";
 import { fieldPath } from "@/types/fieldPath";
 import type { LorbookEntry } from "@/types/botSchema";
 
@@ -82,7 +82,7 @@ interface LorbookRow extends LorbookEntry {
   _key: string;
 }
 
-const entries = useVariantAnyField<LorbookEntry[]>(
+const entries = useField<LorbookEntry[]>(
   fieldPath("background.lorebook"),
   [],
 );

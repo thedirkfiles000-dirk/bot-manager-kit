@@ -74,7 +74,7 @@
 <script setup lang="ts">
 import PanelWrapper from "@/components/PanelWrapper.vue";
 import { ref, watch } from "vue";
-import { useVariantAnyField } from "@/composables/useVariantAnyField.ts";
+import { useField } from "@/composables/useField.ts";
 import { fieldPath } from "@/types/fieldPath";
 import type { PetNameEntry } from "@/types/botSchema";
 
@@ -86,7 +86,7 @@ interface PetNameRow extends PetNameEntry {
   _key: string;
 }
 
-const entries = useVariantAnyField<PetNameEntry[]>(
+const entries = useField<PetNameEntry[]>(
   fieldPath(`${props.charPrefix}.pet_names`),
   [],
 );

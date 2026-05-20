@@ -22,10 +22,6 @@
         >
           <v-card-title class="text-subtitle-1 d-flex align-center">
             Example {{ idx + 1 }}
-            <override-badges
-              :path="`${charPrefix}.dialog_examples.${idx}`"
-              class="ml-2"
-            />
             <v-spacer />
             <v-btn
               icon="mdi-delete"
@@ -79,11 +75,6 @@
       <v-card>
         <v-card-title class="d-flex align-center">
           <span>Editing Example {{ editingIdx !== null ? editingIdx + 1 : "?" }}</span>
-          <v-spacer />
-          <override-badges
-            v-if="editingIdx !== null"
-            :path="`${charPrefix}.dialog_examples.${editingIdx}`"
-          />
         </v-card-title>
 
         <v-card-text>
@@ -168,9 +159,8 @@ import PanelWrapper from "@/components/PanelWrapper.vue";
 import { computed, ref } from "vue";
 import { useBotStore } from "@/stores/botStore";
 import { fieldPath } from "@/types/fieldPath";
-import OverrideBadges from "@/components/OverrideBadges.vue";
 import type { DialogLineBlock } from "@/types/botSchema";
-import { useVariantAnyField } from "@/composables/useVariantAnyField.ts";
+import { useField } from "@/composables/useField.ts";
 
 const props = defineProps<{
   charPrefix: string; // e.g. "character.abc123"
@@ -179,8 +169,8 @@ const props = defineProps<{
 const botStore = useBotStore();
 
 // Single bound field for the whole array. Editing mutates the array in-place
-// then writes the new reference back through the variant-aware setter.
-const examplesField = useVariantAnyField<DialogLineBlock[][]>(
+// then writes the new reference back through useField's setter.
+const examplesField = useField<DialogLineBlock[][]>(
   fieldPath(`${props.charPrefix}.dialog_examples`),
   [],
 );

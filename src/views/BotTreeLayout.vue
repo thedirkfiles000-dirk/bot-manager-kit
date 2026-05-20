@@ -223,7 +223,7 @@ import { useBotStore } from "@/stores/botStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useRoute, useRouter } from "vue-router";
 import { type TreeNode } from "@/types/treeNode";
-import { useVariantAnyField } from "@/composables/useVariantAnyField";
+import { useField } from "@/composables/useField";
 import { fieldPath } from "@/types/fieldPath";
 import { useDisplay } from "vuetify";
 import TreePanel from "@/components/TreePanel.vue";
@@ -249,8 +249,8 @@ const settingsStore = useSettingsStore();
 const router = useRouter();
 const route = useRoute();
 
-const variantBotName = useVariantAnyField<string>(fieldPath("name"));
-const variantCid = useVariantAnyField<string>(fieldPath("cid"));
+const botNameField = useField<string>(fieldPath("name"));
+const botCidField = useField<string>(fieldPath("cid"));
 
 const editDialog = ref(false);
 const editName = ref("");
@@ -441,15 +441,15 @@ function saveEdit() {
     return;
   }
 
-  if (trimmedName !== variantBotName.value) {
-    variantBotName.value = trimmedName;
+  if (trimmedName !== botNameField.value) {
+    botNameField.value = trimmedName;
   }
 
   const trimmedCid = editCid.value.trim();
   const newCid = trimmedCid || ""; // Treat empty as "" (will cleanup if redundant with lower)
 
-  if (newCid !== (variantCid.value || "")) {
-    variantCid.value = newCid;
+  if (newCid !== (botCidField.value || "")) {
+    botCidField.value = newCid;
   }
 
   editDialog.value = false;

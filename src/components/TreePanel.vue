@@ -1,10 +1,6 @@
 <!-- src/components/TreePanel.vue -->
 <template>
   <div class="tree-panel h-100 d-flex flex-column ga-3">
-    <!-- Variant control at top -->
-    <div class="px-4 pt-3">
-      <variant-selector />
-    </div>
     <v-treeview
       :items="computedTreeNodes"
       active-strategy="single-independent"
@@ -23,19 +19,13 @@
         <v-icon :color="'primary'">{{ item.icon }}</v-icon>
       </template>
 
-      <!-- Title with override badge -->
+      <!-- Title -->
       <template #title="{ item }">
         <div
           class="d-flex align-center text-body-2"
           style="white-space: normal; word-break: break-word"
         >
           <span>{{ item.title }}</span>
-          <override-badges
-            v-if="item.subPaths?.length"
-            :path="item.subPaths[0]"
-            :extra-paths="item.subPaths.slice(1)"
-            class="ml-2"
-          />
         </div>
       </template>
 
@@ -99,8 +89,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
 import { useBotStore } from "@/stores/botStore";
-import VariantSelector from "@/components/VariantSelector.vue";
-import OverrideBadges from "@/components/OverrideBadges.vue";
 import { buildFullTree } from "@/utils/treeBuilder";
 import { createDefaultCharacter } from "@/utils/defaultBotGenerator";
 import type { TreeNode } from "@/types/treeNode";

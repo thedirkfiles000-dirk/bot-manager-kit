@@ -113,7 +113,7 @@
 <script setup lang="ts">
 import PanelWrapper from "@/components/PanelWrapper.vue";
 import { computed, ref, watch } from "vue";
-import { useVariantAnyField } from "@/composables/useVariantAnyField.ts";
+import { useField } from "@/composables/useField.ts";
 import { fieldPath } from "@/types/fieldPath";
 import type { ProgressionPhase } from "@/types/botSchema";
 
@@ -134,7 +134,7 @@ const phaseOptions = [
   { title: "Late", value: "late" },
 ];
 
-const phases = useVariantAnyField<ProgressionPhase[]>(
+const phases = useField<ProgressionPhase[]>(
   fieldPath(`${props.charPrefix}.progression_phases`),
   [],
 );

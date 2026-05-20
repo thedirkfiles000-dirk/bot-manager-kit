@@ -42,10 +42,6 @@
             <span class="text-h6 text-truncate pr-2">
               {{ rel.name || "Unnamed Relationship" }}
             </span>
-            <OverrideBadges
-              :path="`${props.charPrefix}.relationships`"
-              class="ml-4"
-            />
           </v-card-title>
           <v-card-subtitle class="pt-2">
             {{ rel.role || "No role specified" }}
@@ -118,8 +114,7 @@
 <script setup lang="ts">
 import PanelWrapper from "@/components/PanelWrapper.vue";
 import { ref, watch } from "vue";
-import OverrideBadges from "@/components/OverrideBadges.vue";
-import { useVariantAnyField } from "@/composables/useVariantAnyField.ts";
+import { useField } from "@/composables/useField.ts";
 import { fieldPath } from "@/types/fieldPath";
 import GenericTextareaPanel from "@/components/panels/GenericTextareaPanel.vue";
 
@@ -134,7 +129,7 @@ interface RelationshipRow {
   notes: string;
 }
 
-const relationships = useVariantAnyField<RelationshipRow[]>(
+const relationships = useField<RelationshipRow[]>(
   fieldPath(`${props.charPrefix}.relationships`),
   [],
 );

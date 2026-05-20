@@ -124,12 +124,6 @@ export interface GrokBotProfile {
   profileImage?: string;
   imagesCount?: number;
   profileUrl?: string;
-  /**
-   * Variant-specific overrides. Each variant overlays the base independently.
-   */
-  variants?: {
-    [k: string]: OverrideBlock;
-  };
 }
 /**
  * Full character profile. Optimized for LLM voice consistency.
@@ -247,17 +241,4 @@ export interface ProgressionPhase {
    */
   cue?: string;
   description: string;
-}
-export interface OverrideBlock {
-  bot_overrides: OverrideEntry[];
-  character_overrides: CharacterOverrideEntry[];
-}
-export interface OverrideEntry {
-  field_path: string;
-  value: unknown;
-}
-export interface CharacterOverrideEntry {
-  character_id: string;
-  field_path: string;
-  value: unknown;
 }

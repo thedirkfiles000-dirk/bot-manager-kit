@@ -3,7 +3,6 @@
   <div class="field-wrapper">
     <div class="d-flex align-center justify-start">
       <span class="text-subtitle-1">{{ props.title }}</span>
-      <override-badges :path="props.path" />
     </div>
     <v-text-field
       v-model="fieldValue"
@@ -23,9 +22,8 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useVariantAnyField } from "@/composables/useVariantAnyField.ts";
+import { useField } from "@/composables/useField.ts";
 import { fieldPath } from "@/types/fieldPath";
-import OverrideBadges from "@/components/OverrideBadges.vue";
 
 const props = defineProps<{
   path: string;
@@ -36,7 +34,7 @@ const props = defineProps<{
   defaultValue?: number;
 }>();
 
-const rawField = useVariantAnyField<number>(fieldPath(props.path), props.defaultValue ?? 25);
+const rawField = useField<number>(fieldPath(props.path), props.defaultValue ?? 25);
 
 const fieldValue = computed({
   get(): string {

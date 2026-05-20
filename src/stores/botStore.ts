@@ -1,5 +1,4 @@
 import { defineStore } from "pinia";
-import { useVariantStore } from "@/stores/variantStore.ts";
 import { computed, ref, watch } from "vue";
 import { appLocalDataDir, join } from "@tauri-apps/api/path";
 import {
@@ -14,7 +13,6 @@ import {
 import { formatAjvErrors, validateBotData, classifyBot } from "@/utils/botValidator.ts";
 import { useComplianceStore } from "@/stores/complianceStore.ts";
 import { CharacterProfile, GrokBotProfile } from "@/types/botSchema.ts";
-import { pruneRedundantOverrides } from "@/utils/variantOverrides.ts";
 import { stripEmpties } from "@/types/typeSupport.ts";
 import { normalizeBot } from "@/utils/migrate.ts";
 import {
@@ -321,6 +319,8 @@ export const useBotStore = defineStore("bot", () => {
 
       // Only clean on load → legacy data disappears from UI & future saves
       delete parsed._valid;
+      // Drop legacy variant overrides — the kit has no variants concept.
+      delete parsed.variants;
       if (parsed.background?.characters) {
         parsed.background.characters = parsed.background.characters.map(
           (c: any) => {
@@ -335,15 +335,6 @@ export const useBotStore = defineStore("bot", () => {
       normalizeBot(parsed as GrokBotProfile);
 
       currentBot.value = parsed;
-
-      // Reset the active variant if it doesn't exist in the newly loaded bot
-      const variantStore = useVariantStore();
-      if (
-        variantStore.activeVariant !== null &&
-        !parsed.variants?.[variantStore.activeVariant]
-      ) {
-        variantStore.setActiveVariant(null);
-      }
 
       const { valid, errors } = validateBotData(currentBot.value);
       if (!valid) {
@@ -427,8 +418,6 @@ export const useBotStore = defineStore("bot", () => {
 
       // Ensure bot folder exists (harmless if already present)
       await mkdir(botFolder, { recursive: true });
-
-      pruneRedundantOverrides(currentBot.value);
 
       const updatedBot = {
         ...currentBot.value,
