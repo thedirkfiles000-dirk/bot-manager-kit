@@ -54,6 +54,12 @@ const routes: RouteRecordRaw[] = [
     beforeEnter: ensureSchemaActive,
   },
   {
+    path: "/s/:schemaName/b/:botId/copy",
+    name: "copy-station",
+    component: () => import("@/views/CopyStationView.vue"),
+    beforeEnter: ensureSchemaActive,
+  },
+  {
     path: "/:pathMatch(.*)*",
     name: "not-found",
     component: () => import("@/views/NotFound.vue"),

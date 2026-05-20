@@ -86,9 +86,10 @@ function openEditDialog() {
   validateNewJson();
 }
 
-function navigateAfterReplace() {
+function navigateAfterReplace(destination: "editor" | "copy-station" = "editor") {
   editDialog.value = false;
-  router.push({ name: "bot-tree", params: { schemaName: schemaName.value, botId } });
+  const target = destination === "editor" ? "bot-tree" : "copy-station";
+  router.push({ name: target, params: { schemaName: schemaName.value, botId } });
 }
 
 /** Replace entire textarea content on paste (user is pasting a complete replacement). */
@@ -318,9 +319,17 @@ onMounted(loadRawBot);
               color="primary"
               variant="tonal"
               prepend-icon="mdi-pencil"
-              @click="navigateAfterReplace()"
+              @click="navigateAfterReplace('editor')"
             >
               Open in Editor
+            </v-btn>
+            <v-btn
+              color="success"
+              variant="tonal"
+              prepend-icon="mdi-export-variant"
+              @click="navigateAfterReplace('copy-station')"
+            >
+              Open in Copy Station
             </v-btn>
           </template>
         </v-card-actions>

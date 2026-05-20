@@ -23,6 +23,14 @@
         </v-list>
       </v-menu>
 
+      <!-- Copy Station -->
+      <v-btn
+        icon="mdi-export-variant"
+        variant="text"
+        title="Copy Station"
+        @click="goToExport"
+      />
+
       <!-- Theme toggle -->
       <v-btn
         :icon="settingsStore.theme === 'dark' ? 'mdi-weather-sunny' : 'mdi-weather-night'"
@@ -352,6 +360,18 @@ async function saveAndLeave() {
     confirmLeaveDialog.value = false;
     goSchemaHome();
   }
+}
+
+async function goToExport() {
+  if (!botStore.currentBot) return;
+  if (botStore.isDirty) {
+    await botStore.save();
+    if (botStore.isDirty) return; // save failed
+  }
+  router.push({
+    name: "copy-station",
+    params: { schemaName: schemaName.value, botId: botStore.currentBot.id },
+  });
 }
 
 function handleReload() {

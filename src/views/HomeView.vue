@@ -444,11 +444,12 @@ async function applyImportedJson() {
   }
 }
 
-function importNavigate() {
+function importNavigate(destination: "editor" | "copy-station" = "editor") {
   const botId = importedBotId.value;
   if (!botId) return;
   closeImportJson();
-  router.push({ name: "bot-tree", params: { schemaName: schemaName.value, botId } });
+  const target = destination === "editor" ? "bot-tree" : "copy-station";
+  router.push({ name: target, params: { schemaName: schemaName.value, botId } });
 }
 
 function toggleSort() {
@@ -611,6 +612,19 @@ const sortIcon = computed(() => {
               <div class="d-flex flex-column align-start">
                 <div class="d-flex ga-2 flex-wrap">
                     <router-link
+                      :to="{ name: 'copy-station', params: { schemaName, botId: bot.id } }"
+                      @click.stop
+                    >
+                      <v-btn
+                        icon="mdi-export-variant"
+                        size="small"
+                        variant="tonal"
+                        color="success"
+                        title="Copy Station"
+                        :disabled="!bot._valid"
+                      />
+                    </router-link>
+                    <router-link
                       :to="{ name: 'raw-bot', params: { schemaName, botId: bot.id } }"
                       @click.stop
                     >
@@ -744,9 +758,17 @@ const sortIcon = computed(() => {
               color="primary"
               variant="tonal"
               prepend-icon="mdi-pencil"
-              @click="importNavigate()"
+              @click="importNavigate('editor')"
             >
               Open in Editor
+            </v-btn>
+            <v-btn
+              color="success"
+              variant="tonal"
+              prepend-icon="mdi-export-variant"
+              @click="importNavigate('copy-station')"
+            >
+              Open in Copy Station
             </v-btn>
           </template>
         </v-card-actions>
