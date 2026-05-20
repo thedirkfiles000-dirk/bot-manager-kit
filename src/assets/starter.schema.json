@@ -201,5 +201,5 @@
     }
   },
 
-  "$comment": "EXTENDING THIS SCHEMA: add properties under `properties`, tag each with x-ui-panel (one of: text, textarea, number, stringList, dialogExamples, or hidden) and x-ui-section + x-ui-order to control where it appears in the editor tree. To export the field, add x-export-target (one of: Intro, Greeting, Background, Dialog Examples), optional x-export-order, optional x-export-label (defaults to the property name). The Copy Station will pick up new fields automatically — no kit code changes needed. Look at the GrokBot schema in bot-manager-desktop for a heavier worked example."
+  "$comment": "EXTENDING THIS SCHEMA: add properties under `properties`, tag each with x-ui-panel (one of: text, textarea, number, stringList, dialogExamples, or hidden) and x-ui-section + x-ui-order to control where it appears in the editor tree. To export the field, add x-export-target (one of: Intro, Greeting, Background, Dialog Examples), optional x-export-order, optional x-export-label (defaults to the property name). The Copy Station will pick up new fields automatically — no kit code changes needed."
 }
