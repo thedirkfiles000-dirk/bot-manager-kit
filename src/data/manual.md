@@ -121,6 +121,44 @@ typos.
 
 ---
 
+# Adopting Existing Bots
+
+If you already have a hand-written bot template you re-use, you don't need
+to design a schema from scratch — an AI can extract one from your examples.
+
+**The workflow:**
+
+1. Hand the AI the bundled Starter schema (or any kit schema — open
+   `schema.json` and copy it). This shows the AI the kit's conventions:
+   `x-ui-*` for editor layout, `x-export-target` for Copy Station routing,
+   and the `$comment` blocks that explain each keyword.
+2. Hand it one or more of your existing bots as examples. Two or three
+   beat one — the AI can tell which fields are always present (required),
+   which are optional, and whether a field like *Likes* is consistently
+   a list or sometimes prose.
+3. Ask for a schema in the same style. Paste the result into a new schema
+   folder (via *New Schema* on the picker, then *Reveal in file manager*
+   to drop it in).
+
+**A prompt that works well:**
+
+> *"Here's the bundled Starter schema as a reference for conventions, and
+> here's an example bot I write by hand. Produce a schema in the same
+> style that captures the structure of my bot. Use `x-ui-section` to group
+> related fields, and map exported fields onto the four output buckets
+> (Intro, Greeting, Background, Dialog Examples)."*
+
+**Iterating:** Load the schema into the kit and open one of your bots in
+the editor. If the tree groups fields oddly, or the Copy Station puts
+something in the wrong output, go back to the AI and tell it what to
+adjust ("move *Pack Name* to its own section called *Werewolf Lore* and
+put it in the Background output"). Two or three turns is usually enough.
+
+The kit validates schemas on load, so a malformed result shows a warning
+in the picker rather than crashing — safe to iterate.
+
+---
+
 # Tips
 
 - **One field, one purpose.** The schema controls layout, but the LLM still
