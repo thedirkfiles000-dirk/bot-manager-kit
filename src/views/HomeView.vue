@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { useRouter } from "vue-router";
-import { appLocalDataDir, join } from "@tauri-apps/api/path";
+import { useRoute, useRouter } from "vue-router";
+import { join } from "@tauri-apps/api/path";
 import {
   exists,
   mkdir,
@@ -13,11 +13,11 @@ import {
   writeTextFile,
 } from "@tauri-apps/plugin-fs";
 import { useBotStore } from "@/stores/botStore.ts";
+import { useActiveSchemaStore } from "@/stores/activeSchemaStore.ts";
+import { botsDirFor } from "@/utils/schemaLoader.ts";
 import { GrokBotProfile } from "@/types/botSchema.ts";
 import { createDefaultBot } from "@/utils/defaultBotGenerator.ts";
-import { formatAjvErrors, validateBotData, classifyBot, type BotCompliance } from "@/utils/botValidator.ts";
-import botSchema from "@/assets/grokbot.schema.json";
-import { useComplianceStore } from "@/stores/complianceStore.ts";
+import { formatAjvErrors } from "@/utils/botValidator.ts";
 import { getMime } from "@/composables/useImageUtils.ts";
 import { useNotify } from "@/composables/useNotify.ts";
 import { botManagerVersion } from "@/main";
@@ -26,10 +26,13 @@ import { useSettingsStore } from "@/stores/settingsStore";
 
 const botStore = useBotStore();
 const settingsStore = useSettingsStore();
-const complianceStore = useComplianceStore();
+const activeSchemaStore = useActiveSchemaStore();
 const router = useRouter();
+const route = useRoute();
 const notify = useNotify();
 const loading = ref(true);
+
+const schemaName = computed(() => route.params.schemaName as string);
 
 const generateUUID = () => crypto.randomUUID();
 
@@ -38,7 +41,6 @@ const botToDelete = ref<GrokBotProfile | null>(null);
 
 interface BotCard extends GrokBotProfile {
   _valid: boolean;
-  _compliance?: BotCompliance;
   profileUrl?: string;
   imagesCount?: number;
 }
@@ -46,16 +48,6 @@ interface BotCard extends GrokBotProfile {
 const bots = ref<BotCard[]>([]);
 
 const filterText = ref("");
-
-const complianceFilter = ref<string | null>(null);
-const complianceEvaluated = ref(false);
-const evaluating = ref(false);
-
-const COMPLIANCE_FILTER_OPTIONS = [
-  { value: 'v2',     label: 'Schema v2',          color: 'success' },
-  { value: 'v1',     label: 'Schema v1',          color: 'blue'    },
-  { value: 'broken', label: 'Other / Broken',     color: 'error'   },
-] as const;
 
 const filteredBots = computed(() => {
   let list = sortedBots.value;
@@ -69,46 +61,32 @@ const filteredBots = computed(() => {
     });
   }
 
-  if (complianceEvaluated.value && complianceFilter.value) {
-    list = list.filter((bot) => bot._compliance === complianceFilter.value);
-  }
-
   return list;
 });
 
 async function duplicateBot(original: GrokBotProfile) {
   try {
-    // Deep clone the saved bot — strip _valid (BotCard-only UI field) before persisting
     const rawClone = JSON.parse(JSON.stringify(original));
     delete rawClone._valid;
     const newBot: BotCard = rawClone;
 
-    // Generate new ID
     newBot.id = generateUUID();
 
-    // Smart duplicate name to avoid immediate conflicts in the list
     let baseName = original.name.trim() || "Unnamed Bot";
     let newName = `${baseName} (Copy)`;
     let counter = 1;
-
-    // Check current in-memory list for naming conflicts
     while (bots.value.some((b) => b.name === newName)) {
       counter++;
       newName = `${baseName} (Copy ${counter})`;
     }
     newBot.name = newName;
-
-    // Update timestamp
     newBot.lastModified = new Date().toISOString();
 
-    // Write new file (folder structure: {id}/bot.json)
-    const appDir = await appLocalDataDir();
-    const botsDir = await join(appDir, "Bot Manager", "bots");
+    const botsDir = await botsDirFor(schemaName.value);
     const newDir = await join(botsDir, newBot.id);
     const imagesDir = await join(newDir, "images");
     await mkdir(imagesDir, { recursive: true });
-    const jsonPath = await join(newDir, "bot.json");
-    await writeTextFile(jsonPath, JSON.stringify(newBot, null, 2));
+    await writeTextFile(await join(newDir, "bot.json"), JSON.stringify(newBot, null, 2));
 
     // Copy images from old bot's images/ subdir
     const oldImagesDir = await join(botsDir, original.id, "images");
@@ -127,7 +105,6 @@ async function duplicateBot(original: GrokBotProfile) {
     }
     newBot.profileImage = original.profileImage;
 
-    // Build BotCard for the home grid
     const card: BotCard = {
       ...newBot,
       _valid: true,
@@ -135,13 +112,11 @@ async function duplicateBot(original: GrokBotProfile) {
       profileUrl: undefined,
     };
 
-    // Update in-memory list immediately (newest on top)
     bots.value.unshift(card);
     bots.value.sort((a, b) =>
       (b.lastModified || "").localeCompare(a.lastModified || ""),
     );
 
-    // Feedback
     snackbarText.value = `Duplicated "${original.name}" as "${newBot.name}"`;
     showSnackbar.value = true;
   } catch (e) {
@@ -158,26 +133,19 @@ function openDeleteDialog(bot: GrokBotProfile) {
 
 async function confirmDelete() {
   if (!botToDelete.value) return;
-
   const bot = botToDelete.value;
 
   try {
-    const appDir = await appLocalDataDir();
-    const botsDir = await join(appDir, "Bot Manager", "bots");
+    const botsDir = await botsDirFor(schemaName.value);
     const botFolder = await join(botsDir, bot.id);
-
-    // Recursively delete the entire bot folder (bot.json + images/ + everything)
     await remove(botFolder, { recursive: true });
 
-    // If this bot was currently open in the editor, clear it
     if (botStore.currentBot?.id === bot.id) {
       botStore.clear();
     }
 
-    // Reload the list
     await loadBots();
 
-    // Success feedback
     snackbarText.value = `Deleted bot "${bot.name}"`;
     showSnackbar.value = true;
   } catch (e) {
@@ -197,32 +165,27 @@ function closeDeleteDialog() {
 
 async function loadBots() {
   loading.value = true;
-  const appDir = await appLocalDataDir();
-  const botsDir = await join(appDir, "Bot Manager", "bots");
-  await mkdir(botsDir, { recursive: true });
+  const botsDir = await botsDirFor(schemaName.value);
 
   const entries = await readDir(botsDir);
   const loaded: BotCard[] = [];
 
   for (const entry of entries) {
-    // Skip obvious files (e.g., any stray .json that shouldn't be there post-migration)
     if (!entry.name || entry.name.endsWith(".json")) continue;
 
-    // Potential bot folder — check for bot.json inside
     const botFolder = await join(botsDir, entry.name);
     const jsonPath = await join(botFolder, "bot.json");
-
-    if (!(await exists(jsonPath))) continue; // Not a valid bot folder
+    if (!(await exists(jsonPath))) continue;
 
     let rawBot: any;
 
     try {
       const content = await readTextFile(jsonPath);
-
       let parsed = JSON.parse(content);
 
-      // Only clean on load → legacy data disappears from UI & future saves
       delete parsed._valid;
+      // Legacy GrokBot character-level usage_hints cleanup (harmless on schemas
+      // that never had it). Will move to schema-driven normalization in task #9.
       if (parsed.background?.characters) {
         parsed.background.characters = parsed.background.characters.map(
           (c: any) => {
@@ -241,19 +204,15 @@ async function loadBots() {
       continue;
     }
 
-    // Optional sanity check: folder name should match bot.id
     if (rawBot.id !== entry.name) {
       console.warn(
         `Bot folder name "${entry.name}" does not match bot.id "${rawBot.id}". Using bot.id for consistency.`,
       );
-      // You could optionally rename the folder here to rawBot.id, but it's risky — better manual fix
     }
 
     const botCard = rawBot as BotCard;
-    const cached = complianceStore.get(rawBot.id, rawBot.lastModified ?? '');
-    botCard._compliance = cached ?? classifyBot(rawBot);
-    if (!cached) complianceStore.set(rawBot.id, rawBot.lastModified ?? '', botCard._compliance);
-    botCard._valid = botCard._compliance !== 'broken';
+    const { valid } = activeSchemaStore.validateBot(rawBot);
+    botCard._valid = valid;
 
     botCard.imagesCount = botCard.images?.length ?? 0;
     botCard.profileUrl = undefined;
@@ -274,110 +233,15 @@ async function loadBots() {
     loaded.push(botCard);
   }
 
-  // Optional: sort loaded bots (e.g., by name or lastModified)
   loaded.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
 
   bots.value = loaded;
-  complianceEvaluated.value = true;
-  complianceFilter.value = null;
-
   loading.value = false;
-}
-
-// async function loadBots() {
-//   loading.value = true;
-//   const appDir = await appLocalDataDir();
-//   const botsDir = await join(appDir, "Bot Manager", "bots");
-//   await mkdir(botsDir, { recursive: true });
-//
-//   const files = await readDir(botsDir);
-//   const loaded: BotCard[] = [];
-//   let invalidCount = 0;
-//
-//   for (const file of files) {
-//     if (!file.name?.endsWith(".json")) continue;
-//
-//     const path = await join(botsDir, file.name);
-//     let rawBot: any;
-//
-//     try {
-//       const content = await readTextFile(path);
-//       rawBot = JSON.parse(content);
-//     } catch (e) {
-//       console.error(`Failed to read or parse bot file ${file.name}:`, e);
-//       continue; // Skip completely unreadable/corrupted files
-//     }
-//
-//     const { valid, errors } = validateBotData(rawBot);
-//
-//     const botCard = rawBot as BotCard;
-//     botCard._valid = valid;
-//
-//     botCard.imagesCount = botCard.images?.length ?? 0;
-//     botCard.profileUrl = undefined;
-//
-//     if (botCard.profileImage) {
-//       try {
-//         const botDir = await join(botsDir, botCard.id);
-//         const imgPath = await join(botDir, botCard.profileImage);
-//         const bytes = await readFile(imgPath);
-//         const mime = getMime(botCard.profileImage); // keep your existing getMime helper
-//         const blob = new Blob([bytes], { type: mime });
-//         botCard.profileUrl = URL.createObjectURL(blob);
-//       } catch (e) {
-//         console.warn(`Failed to load profile image for bot ${botCard.id}:`, e);
-//         botCard.profileUrl = undefined;
-//       }
-//     }
-//
-//     loaded.push(botCard);
-//
-//     if (!valid) {
-//       invalidCount++;
-//       console.warn(
-//         `Bot "${rawBot.name || "Unnamed"}" (${rawBot.id || file.name}) failed schema validation:`,
-//         formatAjvErrors(errors),
-//       );
-//     }
-//   }
-//
-//   // Ensure every loaded bot has its individual directory
-//   // (creates missing ones on startup – prevents "no such directory" when opening folder)
-//   await Promise.all(
-//     loaded.map(async (bot) => {
-//       const botDir = await join(botsDir, bot.id);
-//       await mkdir(botDir, { recursive: true });
-//     }),
-//   );
-//
-//   bots.value = loaded.sort((a, b) =>
-//     (b.lastModified || "").localeCompare(a.lastModified || ""),
-//   );
-//
-//   if (invalidCount > 0) {
-//     snackbarText.value = `${invalidCount} bot(s) failed schema validation and cannot be edited.`;
-//     showSnackbar.value = true;
-//   }
-//
-//   loading.value = false;
-// }
-
-function evaluateCompliance() {
-  evaluating.value = true;
-  complianceStore.clear();
-  for (const bot of bots.value) {
-    bot._compliance = classifyBot(bot);
-    bot._valid = bot._compliance !== 'broken';
-    complianceStore.set(bot.id, bot.lastModified ?? '', bot._compliance);
-  }
-  complianceEvaluated.value = true;
-  evaluating.value = false;
 }
 
 onMounted(async () => {
   await loadBots();
 });
-
 
 /* ==================== IMPORT BOT FEATURE ==================== */
 const importJsonDialog = ref(false);
@@ -412,7 +276,6 @@ function openGlobalImportJson() {
   importedBotId.value = null;
 }
 
-/** Replace entire textarea content on paste (import expects a complete JSON blob). */
 function onImportPaste(e: ClipboardEvent) {
   const text = e.clipboardData?.getData("text/plain");
   if (text != null) {
@@ -457,7 +320,6 @@ function applyOverrides(target: any, source: any) {
 function stripUnknownFields(obj: any, schema: any, root: any = schema): any {
   if (!obj || typeof obj !== "object") return obj;
 
-  // Resolve $ref
   if (schema.$ref) {
     const refPath = schema.$ref.replace("#/", "").split("/");
     let resolved = root;
@@ -480,9 +342,7 @@ function stripUnknownFields(obj: any, schema: any, root: any = schema): any {
       if (key in props) {
         cleaned[key] = stripUnknownFields(obj[key], props[key], root);
       }
-      // Drop keys not in schema (additionalProperties: false)
     }
-    // Also handle additionalProperties that allow arbitrary keys
     if (schema.additionalProperties && typeof schema.additionalProperties === "object") {
       for (const key of Object.keys(obj)) {
         if (!(key in (props ?? {}))) {
@@ -496,7 +356,6 @@ function stripUnknownFields(obj: any, schema: any, root: any = schema): any {
   return obj;
 }
 
-// Main watcher for live validation/preview
 watch(
   importJsonText,
   async (newVal) => {
@@ -508,7 +367,6 @@ watch(
     try {
       let raw: any = JSON.parse(newVal.trim());
 
-      // Support array with one bot
       if (Array.isArray(raw)) {
         if (raw.length !== 1)
           throw new Error("Array must contain exactly one bot");
@@ -521,38 +379,29 @@ watch(
       const newId = generateUUID();
       const now = new Date().toISOString();
 
-      // Start with full defaults
       const merged: GrokBotProfile = JSON.parse(
         JSON.stringify(createDefaultBot()),
       );
 
-      // Recursively override with imported values (discards extras)
       applyOverrides(merged, raw);
 
-      // FORCE fresh metadata (always overrides import)
       merged.id = newId;
       merged.lastModified = now;
-
-      // Always strip images on JSON-only import
       merged.images = [];
       delete merged.profileImage;
 
-      // Fallback name only if missing/empty
       if (!merged.name?.trim()) {
         merged.name = "Imported Bot";
       }
 
-      // Regenerate all character IDs (fresh for import)
       (merged.background?.characters ?? []).forEach((char: any) => {
         char.id = generateUUID();
         char.lastModified = now;
       });
 
-      // Strip any fields not in the schema (applyOverrides copies arrays wholesale)
-      const cleaned = stripUnknownFields(merged, botSchema) as GrokBotProfile;
+      const cleaned = stripUnknownFields(merged, activeSchemaStore.active!.raw) as GrokBotProfile;
 
-      // Final validation
-      const { valid, errors } = validateBotData(cleaned);
+      const { valid, errors } = activeSchemaStore.validateBot(cleaned);
       if (!valid) {
         jsonError.value = "Schema validation failed";
         importValidationErrors.value = formatAjvErrors(errors);
@@ -573,13 +422,9 @@ async function applyImportedJson() {
   const newBot = importedParsed.value;
 
   try {
-    const appDir = await appLocalDataDir();
-    const botsDir = await join(appDir, "Bot Manager", "bots");
-    await mkdir(botsDir, { recursive: true });
-
+    const botsDir = await botsDirFor(schemaName.value);
     const botDir = await join(botsDir, newBot.id);
 
-    // Check for existing bot with same ID (prevent silent overwrite)
     const existingJsonPath = await join(botDir, "bot.json");
     if (await exists(existingJsonPath)) {
       notify.error(
@@ -588,19 +433,15 @@ async function applyImportedJson() {
       return;
     }
 
-    // Create bot folder and images subdir
     await mkdir(botDir, { recursive: true });
     const imagesDir = await join(botDir, "images");
     await mkdir(imagesDir, { recursive: true });
 
-    // Update lastModified for proper sorting
     newBot.lastModified = new Date().toISOString();
 
-    // Persist to disk (new structure)
     const jsonPath = await join(botDir, "bot.json");
     await writeTextFile(jsonPath, JSON.stringify(newBot, null, 2));
 
-    // Add to home grid — sortedBots computed handles ordering
     const card: BotCard = {
       ...newBot,
       _valid: true,
@@ -609,11 +450,9 @@ async function applyImportedJson() {
     };
     bots.value.push(card);
 
-    // Load into store
     botStore.currentBot = newBot;
     botStore.isDirty = false;
 
-    // Show navigation options instead of auto-navigating
     importedBotId.value = newBot.id;
 
     notify.success(`Imported bot "${newBot.name}"`);
@@ -627,11 +466,8 @@ function importNavigate(destination: 'editor' | 'copy-station') {
   const botId = importedBotId.value;
   if (!botId) return;
   closeImportJson();
-  if (destination === 'editor') {
-    router.push({ name: "bot-tree", params: { botId } });
-  } else {
-    router.push({ name: "copy-station", params: { botId } });
-  }
+  const target = destination === 'editor' ? 'bot-tree' : 'copy-station';
+  router.push({ name: target, params: { schemaName: schemaName.value, botId } });
 }
 
 function toggleSort() {
@@ -642,12 +478,10 @@ const sortedBots = computed(() => {
   const list = [...bots.value];
 
   if (sortMode.value === "modified") {
-    // Newest first (descending by lastModified)
     return list.sort((a, b) =>
       (b.lastModified || "").localeCompare(a.lastModified || ""),
     );
   } else {
-    // Alphabetical A-Z by name (case-sensitive; adjust if you want case-insensitive)
     return list.sort((a, b) =>
       (a.name || "Unnamed Bot").localeCompare(b.name || "Unnamed Bot"),
     );
@@ -655,29 +489,48 @@ const sortedBots = computed(() => {
 });
 
 function openBot(botId: string) {
-  router.push({ name: "bot-tree", params: { botId } });
+  router.push({ name: "bot-tree", params: { schemaName: schemaName.value, botId } });
 }
-
-/* ========================================================== */
 
 async function createAndOpenNewBot() {
   await botStore.createNew();
   router.push({
     name: "bot-tree",
-    params: { botId: botStore.currentBot!.id },
+    params: { schemaName: schemaName.value, botId: botStore.currentBot!.id },
   });
+}
+
+function switchSchema() {
+  router.push({ name: "picker" });
 }
 
 const sortIcon = computed(() => {
   return sortMode.value === "modified"
-    ? "mdi-sort-clock-descending-outline" // Newest first (clock descending)
+    ? "mdi-sort-clock-descending-outline"
     : "mdi-sort-alphabetical-ascending";
 });
 </script>
 
 <template>
   <v-container fluid class="pa-4">
-    <!-- Header row: Flexible layout – filter grows, buttons shrink-to-fit on right -->
+    <!-- Active schema header -->
+    <v-row align="center" class="mb-4" no-gutters>
+      <v-col cols="12" md="auto">
+        <div class="d-flex align-center ga-3">
+          <v-btn
+            variant="text"
+            size="small"
+            prepend-icon="mdi-arrow-left"
+            @click="switchSchema"
+          >
+            Switch Schema
+          </v-btn>
+          <span class="text-h6">{{ activeSchemaStore.active?.title || schemaName }}</span>
+        </div>
+      </v-col>
+    </v-row>
+
+    <!-- Header row: filter on left, buttons on right -->
     <v-row align="center" class="mb-6" no-gutters v-if="!loading">
       <v-col cols="12" md="7" lg="6">
         <v-text-field
@@ -694,27 +547,6 @@ const sortIcon = computed(() => {
           @click:append-inner="toggleSort"
           style="max-width: 600px"
         />
-        <div class="d-flex ga-1 mt-2 flex-wrap align-center">
-          <v-btn
-            size="x-small"
-            variant="tonal"
-            :color="complianceEvaluated ? 'success' : 'primary'"
-            :prepend-icon="complianceEvaluated ? 'mdi-check-circle' : 'mdi-shield-search'"
-            :loading="evaluating"
-            @click="evaluateCompliance"
-          >{{ complianceEvaluated ? 'Re-evaluate' : 'Evaluate' }}</v-btn>
-          <template v-if="complianceEvaluated">
-            <v-chip
-              v-for="opt in COMPLIANCE_FILTER_OPTIONS"
-              :key="opt.value"
-              size="x-small"
-              :color="complianceFilter === opt.value ? opt.color : undefined"
-              :variant="complianceFilter === opt.value ? 'elevated' : 'tonal'"
-              label
-              @click="complianceFilter = complianceFilter === opt.value ? null : opt.value"
-            >{{ opt.label }} ({{ bots.filter(b => b._compliance === opt.value).length }})</v-chip>
-          </template>
-        </div>
       </v-col>
 
       <v-col
@@ -750,7 +582,6 @@ const sortIcon = computed(() => {
     <div v-if="loading" class="d-flex justify-center my-8">
       <v-progress-circular indeterminate />
     </div>
-
 
     <div v-if="!loading" class="w-100">
       <div class="d-flex flex-wrap justify-center gap-6">
@@ -788,24 +619,7 @@ const sortIcon = computed(() => {
               </div>
             </v-card-title>
 
-            <!-- Subtitle / info area -->
             <v-card-subtitle class="text-caption text-medium-emphasis pb-2">
-              <div class="d-flex align-center gap-1 mb-1">
-                <v-chip
-                  v-if="bot._compliance === 'broken'"
-                  size="x-small"
-                  color="error"
-                  variant="tonal"
-                  label
-                >Broken</v-chip>
-                <v-chip
-                  v-else
-                  size="x-small"
-                  :color="bot._compliance === 'v2' ? 'success' : 'blue'"
-                  variant="tonal"
-                  label
-                >Schema v{{ bot._compliance === 'v2' ? '2' : '1' }}</v-chip>
-              </div>
               <div>CID: {{ bot.cid ?? "--" }}</div>
               <div>
                 {{ (bot.background?.characters ?? []).length }} character{{ (bot.background?.characters ?? []).length === 1 ? "" : "s" }}
@@ -816,9 +630,8 @@ const sortIcon = computed(() => {
             <v-card-actions class="mt-auto mb-2 px-4">
               <div class="d-flex flex-column align-start">
                 <div class="d-flex ga-2 flex-wrap">
-                    <!-- Export / Copy Station -->
                     <router-link
-                      :to="{ name: 'copy-station', params: { botId: bot.id } }"
+                      :to="{ name: 'copy-station', params: { schemaName, botId: bot.id } }"
                       @click.stop
                     >
                       <v-btn
@@ -830,9 +643,8 @@ const sortIcon = computed(() => {
                         :disabled="!bot._valid"
                       />
                     </router-link>
-                    <!-- Raw JSON view button ��� always enabled, even for invalid bots (helps debugging) -->
                     <router-link
-                      :to="{ name: 'raw-bot', params: { botId: bot.id } }"
+                      :to="{ name: 'raw-bot', params: { schemaName, botId: bot.id } }"
                       @click.stop
                     >
                       <v-btn
@@ -866,7 +678,6 @@ const sortIcon = computed(() => {
         </v-card>
       </div>
 
-      <!-- Empty state when no bots match filter -->
       <div
         v-if="!filteredBots.length"
         class="text-center text-grey-darken-2 w-100 mt-16"
@@ -877,7 +688,6 @@ const sortIcon = computed(() => {
       </div>
     </div>
 
-    <!-- Delete Confirmation Dialog -->
     <v-dialog v-model="deleteDialog" max-width="500px" persistent>
       <v-card>
         <v-card-title class="text-h6 text-error">
@@ -886,8 +696,7 @@ const sortIcon = computed(() => {
         </v-card-title>
         <v-card-text class="text-body-1">
           Are you sure you want to <strong>permanently delete</strong> the bot
-          "<strong>{{ botToDelete?.name || "Unnamed" }}</strong
-          >"?<br /><br />
+          "<strong>{{ botToDelete?.name || "Unnamed" }}</strong>"?<br /><br />
           This action cannot be undone.
         </v-card-text>
         <v-card-actions>
@@ -900,7 +709,6 @@ const sortIcon = computed(() => {
       </v-card>
     </v-dialog>
 
-    <!-- Import JSON Dialog -->
     <v-dialog v-model="importJsonDialog" max-width="800px" persistent>
       <v-card>
         <v-card-title class="text-h6"> Import Bot from JSON </v-card-title>
@@ -987,8 +795,6 @@ const sortIcon = computed(() => {
       </v-card>
     </v-dialog>
 
-
-    <!-- Snackbar -->
     <v-snackbar
       v-model="showSnackbar"
       :text="snackbarText"
@@ -996,8 +802,9 @@ const sortIcon = computed(() => {
       timeout="5000"
     />
     <div class="text-caption text-medium-emphasis text-center mt-8 pb-2">
-      Bot Manager v{{ botManagerVersion() }}
-    </div>  </v-container>
+      Bot Manager Kit v{{ botManagerVersion() }}
+    </div>
+  </v-container>
 </template>
 
 <style scoped>
@@ -1011,11 +818,11 @@ const sortIcon = computed(() => {
 
 .card-title {
   font-size: medium;
-  line-height: 1.15; /* Tighten wrapped lines — adjust 1.1–1.25 to taste */
-  word-break: break-word; /* Safe break for long words */
-  overflow-wrap: anywhere; /* Modern fallback */
-  margin: 0; /* Remove any default margin */
-  padding: 0; /* Ensure no extra padding */
+  line-height: 1.15;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  margin: 0;
+  padding: 0;
 }
 
 .bot-card:hover {
@@ -1023,8 +830,6 @@ const sortIcon = computed(() => {
 }
 
 .gap-6 > * {
-  /* Custom gap utility (Vuetify doesn't have ga-6 by default) */
-  margin: 12px; /* Adjust as needed; or use ma-4 on cards instead */
+  margin: 12px;
 }
-
 </style>

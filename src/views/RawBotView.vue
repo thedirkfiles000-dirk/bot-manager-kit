@@ -1,17 +1,20 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { appLocalDataDir, join } from "@tauri-apps/api/path";
+import { join } from "@tauri-apps/api/path";
 import { readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
-import { formatAjvErrors, validateBotData, classifyBot } from "@/utils/botValidator.ts";
+import { formatAjvErrors } from "@/utils/botValidator.ts";
+import { useActiveSchemaStore } from "@/stores/activeSchemaStore.ts";
+import { botsDirFor } from "@/utils/schemaLoader.ts";
 import { useNotify } from "@/composables/useNotify.ts";
-import { useComplianceStore } from "@/stores/complianceStore.ts";
 
 const route = useRoute();
 const router = useRouter();
 const notify = useNotify();
+const activeSchemaStore = useActiveSchemaStore();
 
 const botId = route.params.botId as string;
+const schemaName = computed(() => route.params.schemaName as string);
 
 const jsonText = ref<string>("");
 const prettyJson = ref<string>("");
@@ -43,22 +46,19 @@ async function loadRawBot() {
   isValid.value = null;
 
   try {
-    const appDir = await appLocalDataDir();
-    const botsDir = await join(appDir, "Bot Manager", "bots");
+    const botsDir = await botsDirFor(schemaName.value);
     const botFolder = await join(botsDir, botId);
     const path = await join(botFolder, "bot.json");
 
     const content = await readTextFile(path);
     jsonText.value = content;
 
-    // Attempt to pretty-print (will fail gracefully if not valid JSON)
     try {
       const parsed = JSON.parse(content);
       prettyJson.value = JSON.stringify(parsed, null, 2);
       botName.value = parsed.name || "Unnamed Bot";
 
-      // Run schema validation
-      const { valid, errors } = validateBotData(parsed);
+      const { valid, errors } = activeSchemaStore.validateBot(parsed);
       isValid.value = valid;
       if (!valid) {
         validationErrors.value = formatAjvErrors(errors);
@@ -88,11 +88,8 @@ function openEditDialog() {
 
 function navigateAfterReplace(destination: 'editor' | 'copy-station') {
   editDialog.value = false;
-  if (destination === 'editor') {
-    router.push({ name: "bot-tree", params: { botId } });
-  } else {
-    router.push({ name: "copy-station", params: { botId } });
-  }
+  const target = destination === 'editor' ? 'bot-tree' : 'copy-station';
+  router.push({ name: target, params: { schemaName: schemaName.value, botId } });
 }
 
 /** Replace entire textarea content on paste (user is pasting a complete replacement). */
@@ -115,7 +112,7 @@ function validateNewJson() {
 
   try {
     const parsed = JSON.parse(newJsonText.value);
-    const { valid, errors } = validateBotData(parsed);
+    const { valid, errors } = activeSchemaStore.validateBot(parsed);
     dialogIsValid.value = valid;
     if (!valid) {
       dialogValidationErrors.value = formatAjvErrors(errors);
@@ -129,8 +126,7 @@ watch(newJsonText, validateNewJson);
 
 async function performReplacement() {
   try {
-    const appDir = await appLocalDataDir();
-    const botsDir = await join(appDir, "Bot Manager", "bots");
+    const botsDir = await botsDirFor(schemaName.value);
     const botFolder = await join(botsDir, botId);
     const path = await join(botFolder, "bot.json");
     const bakPath = await join(botFolder, "bot.json.bak");
@@ -145,11 +141,6 @@ async function performReplacement() {
     if (original.cid) parsed.cid = original.cid;
     parsed.lastModified = new Date().toISOString();
     const finalJson = JSON.stringify(parsed, null, 2);
-
-    // Update compliance cache for this bot
-    const complianceStore = useComplianceStore();
-    const compliance = classifyBot(parsed);
-    complianceStore.set(botId, parsed.lastModified, compliance);
 
     await writeTextFile(path, finalJson);
 
@@ -189,7 +180,7 @@ onMounted(loadRawBot);
         <v-btn
           color="primary"
           prepend-icon="mdi-arrow-left"
-          @click="router.push({ name: 'home' })"
+          @click="router.push({ name: 'schema-home', params: { schemaName } })"
         >
           Back to Home
         </v-btn>

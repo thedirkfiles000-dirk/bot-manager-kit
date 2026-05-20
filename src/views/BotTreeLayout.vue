@@ -249,6 +249,8 @@ const settingsStore = useSettingsStore();
 const router = useRouter();
 const route = useRoute();
 
+const schemaName = computed(() => route.params.schemaName as string);
+
 const botNameField = useField<string>(fieldPath("name"));
 const botCidField = useField<string>(fieldPath("cid"));
 
@@ -352,25 +354,29 @@ function collectParentIds(
   return [];
 }
 
+function goSchemaHome() {
+  router.push({ name: "schema-home", params: { schemaName: schemaName.value } });
+}
+
 function processHomeClick() {
   if (botStore.isDirty) {
     confirmLeaveDialog.value = true;
   } else {
-    router.push("/");
+    goSchemaHome();
   }
 }
 
 function discardAndLeave() {
   botStore.clear();
   confirmLeaveDialog.value = false;
-  router.push("/");
+  goSchemaHome();
 }
 
 async function saveAndLeave() {
   await botStore.save();
   if (!botStore.isDirty) {
     confirmLeaveDialog.value = false;
-    router.push("/");
+    goSchemaHome();
   }
 }
 
@@ -380,7 +386,10 @@ async function goToExport() {
     await botStore.save();
     if (botStore.isDirty) return; // save failed
   }
-  router.push({ name: "copy-station", params: { botId: botStore.currentBot.id } });
+  router.push({
+    name: "copy-station",
+    params: { schemaName: schemaName.value, botId: botStore.currentBot.id },
+  });
 }
 
 function handleReload() {

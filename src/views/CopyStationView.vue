@@ -94,6 +94,7 @@ const botStore = useBotStore();
 const settingsStore = useSettingsStore();
 const loading = ref(true);
 
+const schemaName = computed(() => route.params.schemaName as string);
 const bot = computed(() => botStore.currentBot);
 const station = useCopyStation(bot, exportTargets);
 
@@ -106,11 +107,14 @@ onMounted(async () => {
 });
 
 function goHome() {
-  router.push("/");
+  router.push({ name: "schema-home", params: { schemaName: schemaName.value } });
 }
 
 function goToEditor() {
   if (!bot.value) return;
-  router.push({ name: "bot-tree", params: { botId: bot.value.id } });
+  router.push({
+    name: "bot-tree",
+    params: { schemaName: schemaName.value, botId: bot.value.id },
+  });
 }
 </script>

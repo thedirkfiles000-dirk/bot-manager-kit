@@ -1,7 +1,7 @@
 {
-  "productName": "Bot Manager Desktop",
+  "productName": "Bot Manager Kit",
   "version": "1.0.0",
-  "identifier": "com.dirk.bot-manager-desktop",
+  "identifier": "com.dirk.bot-manager-kit",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:3000",
@@ -12,7 +12,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Bot Manager",
+        "title": "Bot Manager Kit",
         "width": 1850,
         "height": 1200,
         "minWidth": 800,

@@ -1,34 +1,38 @@
 import AJV, { type ErrorObject } from "ajv";
-import addFormats from "ajv-formats"; // Optional: for date-time, etc.
-import ajvErrors from "ajv-errors"; // Optional: better error messages
+import addFormats from "ajv-formats";
+import ajvErrors from "ajv-errors";
 
-// Load schema (adjust path if in public/)
-import botSchema from "@/assets/grokbot.schema.json";
+export interface BotValidator {
+  validate(data: unknown): { valid: boolean; errors: ErrorObject[] };
+}
 
-const ajv = new AJV({
-  allErrors: true,     // Show all errors, not just first
-  strict: true,
-  verbose: true,       // More detailed errors
-  allowUnionTypes: true,
-});
+/**
+ * Compile a JSON Schema into a reusable validator. One AJV instance per
+ * validator keeps things simple — schemas are small and compile is fast.
+ */
+export function createBotValidator(schema: unknown): BotValidator {
+  const ajv = new AJV({
+    allErrors: true,
+    strict: true,
+    verbose: true,
+    allowUnionTypes: true,
+  });
+  addFormats(ajv);
+  ajvErrors(ajv);
 
-addFormats(ajv);       // Enables format: "date-time", etc.
-ajvErrors(ajv);        // Optional nicer messages
+  const fn = ajv.compile(schema as object);
 
-// Compile once for performance
-const validateBot = ajv.compile(botSchema);
-
-export function validateBotData(data: unknown): { valid: boolean; errors: ErrorObject[] } {
-  const valid = validateBot(data);
   return {
-    valid,
-    errors: validateBot.errors ?? [],
+    validate(data: unknown) {
+      const valid = fn(data) as boolean;
+      return { valid, errors: fn.errors ?? [] };
+    },
   };
 }
 
-// Helper to format errors for UI
+/** Human-readable formatting for AJV error objects. */
 export function formatAjvErrors(errors: ErrorObject[]): string[] {
-  return errors.map(err => {
+  return errors.map((err) => {
     const path = err.instancePath || "root";
     const params = err.params as Record<string, string>;
     if (err.keyword === "additionalProperties")
@@ -37,34 +41,4 @@ export function formatAjvErrors(errors: ErrorObject[]): string[] {
       return `${path}: missing required field "${params.missingProperty}"`;
     return `${path}: ${err.message}`;
   });
-}
-
-/* ==================== COMPLIANCE CLASSIFICATION ==================== */
-
-export type BotCompliance = 'v2' | 'v1' | 'broken';
-
-// UI-only fields added by BotCard that aren't part of the schema
-const UI_FIELDS = ['_valid', '_compliance'];
-
-/** Classify a bot's schema compliance. Pure function — no caching. */
-export function classifyBot(data: unknown): BotCompliance {
-  if (!data || typeof data !== 'object') return 'broken';
-
-  // Strip UI-only fields before validating against the schema
-  const clean = { ...(data as Record<string, unknown>) };
-  for (const f of UI_FIELDS) delete clean[f];
-
-  // Try v2 schema validation
-  const { valid } = validateBotData(clean);
-  if (valid) return 'v2';
-
-  // V1 heuristic: has core structural fields but fails current schema validation
-  const d = data as any;
-  const hasBasicStructure =
-    typeof d.id === 'string' &&
-    typeof d.name === 'string' &&
-    d.background &&
-    Array.isArray(d.background.characters);
-
-  return hasBasicStructure ? 'v1' : 'broken';
 }
