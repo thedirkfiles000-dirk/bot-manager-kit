@@ -1,6 +1,6 @@
 <!-- src/components/panels/GenericTextareaPanel.vue -->
 <template>
-  <panel-wrapper :title="title || capitalized" :max-width="900" bordered>
+  <panel-wrapper :title="title || capitalized" :max-width="1600" bordered>
     <v-textarea
       v-model="field"
       variant="outlined"

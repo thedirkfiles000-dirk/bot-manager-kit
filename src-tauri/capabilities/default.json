@@ -4,6 +4,10 @@
   "permissions": [
     "core:default",
     "shell:allow-open",
+    {
+      "identifier": "opener:allow-reveal-item-in-dir",
+      "allow": [{ "path": "$APPLOCALDATA/**" }]
+    },
     "store:default",
     "dialog:default",
     "clipboard-manager:allow-write-text",

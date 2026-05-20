@@ -14,7 +14,7 @@ import {
   rename,
   writeTextFile,
 } from "@tauri-apps/plugin-fs";
-import { open as shellOpen } from "@tauri-apps/plugin-shell";
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import bundledStarterSchema from "@/assets/starter.schema.json";
 import type { SchemaMetadata } from "@/stores/activeSchemaStore";
 
@@ -278,5 +278,5 @@ export async function revealSchemaInFileManager(name: string): Promise<void> {
   if (!(await exists(dir))) {
     throw new Error(`Schema "${name}" not found.`);
   }
-  await shellOpen(dir);
+  await revealItemInDir(dir);
 }
