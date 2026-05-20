@@ -34,6 +34,12 @@ withDefaults(defineProps<{
 
 <style scoped>
 .panel-container {
+  /*
+   * width: 100% combined with max-width fills the available editor area
+   * up to maxWidth, then centers via auto margins. Without width: 100%,
+   * the auto margins in a flex-column parent collapse to content width.
+   */
+  width: 100%;
   margin: 0 auto;
 }
 .panel-header--bordered {
