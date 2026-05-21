@@ -1,60 +1,103 @@
-# Bot Manager Desktop
+# Bot Manager Kit
 
-A free, open-source desktop app for building roleplay chatbot profiles for **PolyBuzz**. No accounts, no cloud, no telemetry — your bots stay on your machine.
+A free, open-source desktop app for designing your own roleplay chatbot profile structure and authoring bots against it. You write a JSON Schema describing the fields your bots have; the app builds the editor and Copy Station from it. No accounts, no cloud, no telemetry — your schemas and bots stay on your machine.
 
-If you've ever tried to write a bot prompt from scratch in a text box, you know the pain: no structure, no validation, no way to manage variants, no idea why the LLM keeps breaking character. Bot Manager Desktop gives you a structured editor that produces clean, consistent prompts.
+If you've used **Bot Manager Desktop**, the Kit is its schema-driven cousin: same idea, but you're in charge of the bot's shape. Have a different mental model for werewolf bots than for mafia bots? Make a schema for each. The app keeps their libraries and exports separate.
 
 <!-- ![Screenshot](docs/screenshot.png) -->
 
 ## Download
 
-**[Download the latest Windows installer (.msi)](https://github.com/thedirkfiles000-dirk/bot-manager-desktop/releases/latest)**
+**[Download the latest Windows installer (.msi)](https://github.com/thedirkfiles000-dirk/bot-manager-kit/releases/latest)**
 
-No install prerequisites — just download, run, and start building bots.
+No install prerequisites — just download, run, pick the bundled Starter schema (or write your own), and start building.
+
+---
+
+## How it differs from Bot Manager Desktop
+
+| | **Bot Manager Desktop** | **Bot Manager Kit** |
+|--|--|--|
+| Schema | Fixed — designed for PolyBuzz | Yours — any JSON Schema |
+| Editor tree | Hardcoded sections | Generated from your schema |
+| Copy Station | PolyBuzz-shaped | 4 buckets (Intro, Greeting, Background, Dialog Examples) populated from schema annotations |
+| Best for | Authoring PolyBuzz bots without thinking about structure | Authoring bots for any platform, or running multiple bot types side-by-side |
+
+Both apps store everything locally and have no network calls.
 
 ---
 
 ## Features
 
-**Structured bot editor** — Every aspect of a bot profile has its own section: characters, world-building, scenario, RP rules, boundaries, and more. Navigate the tree, fill in what matters, skip what doesn't.
+**Schema picker** — Each schema is a folder under `BotSchemas/`. The picker lists them on launch; you choose one per session. Create, duplicate, rename, delete, or reveal a schema's folder in the OS file manager, all from the picker page.
 
-**Characters** — Full profiles with appearance, personality, backstory, relationships, skills, behavior rules, dialog examples, pet names, and progression phases. As many characters per bot as you need, subject to space limitations imposed by PolyBuzz. 
+**Schema-driven editor** — The editor tree builds itself from your schema's `properties`. A field's `x-ui-panel` annotation picks the form widget (text, textarea, number, string-list, dialog-examples); `x-ui-section` groups related fields; `x-ui-order` sets the order. Add a field to `schema.json` and it appears in the editor on next launch — no code change needed.
 
-**Variants** — Maintain alternate versions of a bot (different scenarios, tonal shifts, tweaked personalities) without duplicating everything. A variant stores only what differs from the base.
+**Copy Station** — Four output cards (Intro, Greeting, Background, Dialog Examples) corresponding to the fields most chat-bot platforms ask for on their bot-creation forms. Each field's `x-export-target` annotation assigns it to a bucket; the app renders markdown shaped by the field's panel type. Per-field mask toggles let you hide individual fields from the export.
 
-**Progression Phases** — Soft instructions that tell the LLM how the character should evolve over the course of a conversation. Phase shifts, narrative shifts, tone shifts — with configurable windows.
+**Lifecycle GUI** — No need to touch the AppData folder. New, duplicate, rename, delete, and reveal-in-file-manager are all on the picker.
 
-**Copy Station** — One-click export to clipboard, field by field, formatted for PolyBuzz. Supports Markdown, YAML, and JSON output. CAPS_KEYS mode for LLMs that respond better to uppercase labels.
+**Schema validation** — AJV validates each bot on save against the active schema. Typos in property names are caught (`additionalProperties: false`); required fields are enforced. Malformed schemas show a warning in the picker rather than crashing the app.
 
-**Mask Sections** — Binary-search tool for isolating content that triggers platform policy violations. Mask a section, re-upload, check if the flag clears. No data is changed — just temporarily hidden from the export.
+**Image management** — Upload and manage bot profile images. The bot's `profileImage` field is used for the Library card thumbnail.
 
-**Consistency checker** — Flags structural issues before you export: orphaned relationship references, duplicate progression phases, dialog speakers that don't match the cast, and more.
+**Raw JSON view** — Inspect the underlying bot file. Paste a full replacement to fix something the editor doesn't expose; the replacement is schema-validated before save.
 
-**Lean schema** — Only name, intro, and greeting are required. Everything else is optional. Fill in what matters to your story — empty fields are automatically stripped from the export so they don't dilute the LLM's attention. If you're interested in the full schema structure, you can find it in the src/assets folder. See scheme-example.json at the project root for an example of what a filled out bot looks like.
-
-**Import/Export** — Move bots between machines via JSON. Full schema validation on import.
-
-**Image management** — Upload and manage bot profile images alongside the profile data.
+**Bundled Starter schema** — Heavily commented example schema, demonstrating every kit annotation. Copy it as your starting point or read the comments to learn the conventions.
 
 ---
 
-## How it works
+## Designing your schema
 
-You build a bot as a structured tree of sections. When you're ready to publish, open the Copy Station, copy each field to your clipboard, and paste it into PolyBuzz's form. The app handles formatting, empty-field stripping, and variant merging — you just paste.
+The bundled Starter schema's `$comment` blocks document every kit-recognized keyword. The full set:
 
-Empty fields are intentionally omitted from exports. An early discovery: exporting empty appearance fields (e.g. `Hair Color:`, `Eye Color:`) caused the LLM to ignore the values that *were* filled in. Removing the empties made the specified values rock solid. The practical rule: fill in a field only if it matters to your story.
+| Keyword | What it does |
+|---|---|
+| `x-ui-panel` | Form widget: `text`, `textarea`, `number`, `stringList`, `dialogExamples`, `hidden` |
+| `x-ui-section` | Folder name in the editor tree |
+| `x-ui-order` | Sort order within a section |
+| `x-ui-label` | Override the field's displayed title |
+| `x-ui-helper` | Helper text shown under the field |
+| `x-export-target` | One of `Intro`, `Greeting`, `Background`, `Dialog Examples` |
+| `x-export-order` | Sort order within the export bucket |
+| `x-export-label` | Override the field's exported label |
+
+Standard JSON Schema keywords (`required`, `default`, `enum`, `minimum`, `maxLength`, `items`, `$ref`, etc.) work alongside these.
+
+### Asking an AI to write or extend your schema
+
+The kit's annotations are simple enough that any modern LLM (Claude, GPT, Gemini) handles them well:
+
+- **To extend a schema:** paste your `schema.json` and describe the change. *"Add a BIRTHPLACE field under AGE. Text field. Show me the updated schema."*
+- **To adopt an existing template:** hand the AI the bundled Starter schema as a conventions reference plus one or two examples of bots you already write by hand. Ask for a schema in the same style. *"Use `x-ui-section` to group related fields, and map exported fields onto the four output buckets."*
+
+Paste the result back into the schema's folder and reload. The kit validates on load, so a malformed schema shows a warning rather than crashing — safe to iterate.
 
 ---
 
 ## Data storage
 
-Bots are stored as local JSON files:
+Each schema lives in its own folder, alongside the bots that conform to it:
 
-| OS      | Path |
-|---------|------|
-| Windows | `%LOCALAPPDATA%\com.dirk.bot-manager-desktop\Bot Manager Desktop\bots\` |
+| OS | Path |
+|---|---|
+| Windows | `%LOCALAPPDATA%\com.dirk.bot-manager-kit\BotSchemas\<schema-name>\` |
 
-Each bot is a folder containing `bot.json` and any associated images. Everything stays on your machine.
+Inside a schema folder:
+
+```
+BotSchemas/
+  Starter/
+    schema.json
+    bots/
+      <uuid>/
+        bot.json
+        images/
+          profile.jpg
+          ...
+```
+
+Schemas and bots are plain JSON — version-control them, sync them between machines via Dropbox/Drive/etc., share them by zipping the folder.
 
 ---
 
@@ -89,13 +132,14 @@ The MSI installer is output to `src-tauri/target/release/bundle/msi/`.
 - [Tauri 2](https://tauri.app/) — Rust-backed desktop runtime
 - [Vue 3](https://vuejs.org/) + [Vuetify](https://vuetifyjs.com/) — UI framework
 - [Pinia](https://pinia.vuejs.org/) — state management
+- [AJV](https://ajv.js.org/) — JSON Schema validation
 - [Vite](https://vite.dev/) — build tooling
 
 ---
 
 ## Contributing
 
-Bug reports and feature requests are welcome — [open an issue](https://github.com/thedirkfiles-000/bot-manager-desktop/issues). If you want to submit a PR, open an issue first to discuss the change.
+Bug reports and feature requests are welcome — [open an issue](https://github.com/thedirkfiles000-dirk/bot-manager-kit/issues). If you want to submit a PR, open an issue first to discuss the change.
 
 ---
 
