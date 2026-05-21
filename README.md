@@ -2,7 +2,7 @@
 
 A free, open-source desktop app for designing your own roleplay chatbot profile structure and authoring bots against it. You write a JSON Schema describing the fields your bots have; the app builds the editor and Copy Station from it. No accounts, no cloud, no telemetry — your schemas and bots stay on your machine.
 
-If you've used **Bot Manager Desktop**, the Kit is its schema-driven cousin: same idea, but you're in charge of the bot's shape. Have a different mental model for werewolf bots than for mafia bots? Make a schema for each. The app keeps their libraries and exports separate.
+If you've used **Bot Manager Desktop**, the Kit is its schema-driven cousin: same idea, but you're in charge of the bot's shape. Have a different mental model for werewolf bots than for Mafia bots? Make a schema for each. The app keeps their libraries and exports separate.
 
 <!-- ![Screenshot](docs/screenshot.png) -->
 
