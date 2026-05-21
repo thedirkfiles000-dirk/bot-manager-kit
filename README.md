@@ -18,10 +18,10 @@ No install prerequisites — just download, run, pick the bundled Starter schema
 
 | | **Bot Manager Desktop** | **Bot Manager Kit** |
 |--|--|--|
-| Schema | Fixed — designed for PolyBuzz | Yours — any JSON Schema |
+| Schema | Fixed — designed by me and will mutate as I experiment | Yours — any JSON Schema, and under your control |
 | Editor tree | Hardcoded sections | Generated from your schema |
-| Copy Station | PolyBuzz-shaped | 4 buckets (Intro, Greeting, Background, Dialog Examples) populated from schema annotations |
-| Best for | Authoring PolyBuzz bots without thinking about structure | Authoring bots for any platform, or running multiple bot types side-by-side |
+| Copy Station | Handcrafted organization | 4 buckets (Intro, Greeting, Background, Dialog Examples) populated from schema annotations |
+| Best for | Authoring PolyBuzz bots without thinking about structure since you'll be using mine | Authoring PolyBuzz bots with your own custom approach to bot organization |
 
 Both apps store everything locally and have no network calls.
 
